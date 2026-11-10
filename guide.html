@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>دليل تشغيل واستخدام تطبيق مصروفي</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 15mm;
+    }
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    body {
+      font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      color: #1e293b;
+      background-color: #ffffff;
+      line-height: 1.6;
+      font-size: 13pt;
+    }
+    .header {
+      text-align: center;
+      padding-bottom: 20px;
+      margin-bottom: 25px;
+      border-bottom: 3px solid #10b981;
+    }
+    .logo-badge {
+      display: inline-block;
+      background: #10b981;
+      color: white;
+      font-size: 24pt;
+      font-weight: 800;
+      padding: 8px 25px;
+      border-radius: 16px;
+      margin-bottom: 10px;
+    }
+    h1 {
+      margin: 8px 0 4px 0;
+      color: #0f172a;
+      font-size: 20pt;
+    }
+    .subtitle {
+      color: #64748b;
+      font-size: 13pt;
+      margin: 0;
+    }
+    .card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      page-break-inside: avoid;
+    }
+    .card-primary {
+      border-right: 6px solid #10b981;
+      background: #f0fdf4;
+    }
+    .card-warning {
+      border-right: 6px solid #f59e0b;
+      background: #fefce8;
+    }
+    h2 {
+      color: #0f172a;
+      font-size: 15pt;
+      margin-top: 0;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      border-bottom: 1px solid #cbd5e1;
+      padding-bottom: 6px;
+    }
+    ol, ul {
+      margin: 0;
+      padding-right: 24px;
+    }
+    li {
+      margin-bottom: 10px;
+    }
+    .code-box {
+      background: #0f172a;
+      color: #38bdf8;
+      font-family: Consolas, 'Courier New', monospace;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 11pt;
+      direction: ltr;
+      text-align: left;
+      margin: 8px 0;
+      display: inline-block;
+      width: 100%;
+    }
+    .grid {
+      display: flex;
+      gap: 14px;
+      margin-bottom: 15px;
+    }
+    .grid-item {
+      flex: 1;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 6px;
+      font-size: 10pt;
+      font-weight: bold;
+    }
+    .badge-green { background: #d1fae5; color: #047857; }
+    .badge-red { background: #fee2e2; color: #b91c1c; }
+    .badge-blue { background: #dbeafe; color: #1d4ed8; }
+    .footer {
+      margin-top: 30px;
+      padding-top: 15px;
+      border-top: 1px solid #e2e8f0;
+      text-align: center;
+      color: #94a3b8;
+      font-size: 10pt;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="logo-badge">📱 مصروفي</div>
+    <h1>دليل تشغيل واستخدام تطبيق «مصروفي»</h1>
+    <p class="subtitle">نظام ذكي وشامل لإدارة المصروفات الشهرية والميزانية على نظام الأندرويد</p>
+  </div>
+
+  <div class="card card-primary">
+    <h2>🚀 البدء السريع: تشغيل التطبيق على الهاتف في 3 خطوات</h2>
+    <ol>
+      <li>
+        <strong>تثبيت تطبيق Expo Go:</strong><br>
+        افتح متجر <em>Google Play</em> على هاتفك الأندرويد وابحث عن <strong>Expo Go</strong> وقم بتثبيته (مجاني بالكامل).
+      </li>
+      <li>
+        <strong>تشغيل التطبيق من الكمبيوتر:</strong><br>
+        اضغط مرتين على الملف الجاهز:
+        <div class="code-box">run-app.bat</div>
+        أو افتح موجه الأوامر داخل مجلد المشروع ونفّذ:
+        <div class="code-box">cd masrofy &amp;&amp; npx expo start</div>
+      </li>
+      <li>
+        <strong>مسح رمز الاستجابة السريعة (QR Code):</strong><br>
+        سيظهر رمز QR Code على شاشة الكمبيوتر، افتح تطبيق <strong>Expo Go</strong> على هاتفك واختر <strong>Scan QR code</strong> وامسح الرمز، ليفتح التطبيق فوراً.
+      </li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2>📱 جولة في أقسام التطبيق وطريقة الاستخدام</h2>
+    
+    <div class="grid">
+      <div class="grid-item">
+        <span class="badge badge-green">1. الرئيسية (Dashboard)</span>
+        <p style="margin: 8px 0 0 0; font-size: 11pt;">
+          تعرض صافي الرصيد المتبقي للشهر الحالي، مع إجمالي الدخل والمصروفات، وشريط مؤشر استهلاك الميزانية الذي يتغير لونه تلقائياً وفق معدل الصرف.
+        </p>
+      </div>
+      <div class="grid-item">
+        <span class="badge badge-blue">2. تسجيل المعاملات</span>
+        <p style="margin: 8px 0 0 0; font-size: 11pt;">
+          زر «إضافة مصروف» أو «إضافة دخل» يتيح لك إدخال المبلغ وتحديد الفئة (طعام، فواتير، مواصلات...) واختيار طريقة الدفع (كاش، بطاقة، محفظة).
+        </p>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="grid-item">
+        <span class="badge badge-green">3. التحليلات والإحصائيات</span>
+        <p style="margin: 8px 0 0 0; font-size: 11pt;">
+          رسوم بيانية توضح نسب استهلاك الميزانية، معدل التوفير، وتوزيع المصروفات حسب التصنيف الأكثر استهلاكاً وطرق الدفع.
+        </p>
+      </div>
+      <div class="grid-item">
+        <span class="badge badge-red">4. سجل العمليات والبحث</span>
+        <p style="margin: 8px 0 0 0; font-size: 11pt;">
+          البحث الفوري بأي كلمة أو ملاحظة، وفلترة المعاملات بحسب نوعها (الكل، مصروفات فقط، دخل فقط)، مع إمكانية حذف أي معاملة.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card card-warning">
+    <h2>⚙️ ضبط العملة والميزانية وتصدير التقارير</h2>
+    <ul>
+      <li><strong>اختيار العملة:</strong> من شاشة الإعدادات، يمكنك اختيار العملة المناسبة لك (جنيه مصري، ريال سعودي، درهم، دولار، دينار...).</li>
+      <li><strong>تحديد الميزانية الشهرية:</strong> يمكنك تعديل المبلغ المستهدف شهرياً لتلقي تنبيهات عند الاقتراب من تجاوزه.</li>
+      <li><strong>مشاركة التقرير:</strong> زر مخصص لمشاركة ملخص شهري نصي شامل عبر الواتساب أو نسخه للملاحظات.</li>
+      <li><strong>البيانات التجريبية:</strong> يمكنك الضغط على «تحميل بيانات تجريبية» لمشاهدة كافة الرسوم والتقارير بأرقام واقعية.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>📦 استخراج ملف APK مباشر للتثبيت الدائم</h2>
+    <p>إذا رغبت في تثبيت التطبيق بشكل دائم على هاتفك كملف <strong>APK</strong> مستقل دون الحاجة لفتح الكمبيوتر أو Expo Go:</p>
+    <ol>
+      <li>سجل حساباً مجانياً على موقع <em>expo.dev</em>.</li>
+      <li>في موجه الأوامر داخل مجلد المشروع، اكتب:
+        <div class="code-box">npx eas build -p android --profile preview</div>
+      </li>
+      <li>ستحصل على رابط تحميل مباشر لملف <strong>.apk</strong> لتثبيته فوراً على أي هاتف أندرويد.</li>
+    </ol>
+  </div>
+
+  <div class="footer">
+    تم إعداد هذا الدليل لمشروع تطبيق «مصروفي» للأندرويد — جميع الحقوق محفوظة
+  </div>
+
+</body>
+</html>

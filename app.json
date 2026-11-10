@@ -1,0 +1,65 @@
+{
+  "expo": {
+    "name": "مصروفي - Masrofy",
+    "slug": "masrofy",
+    "version": "2.4.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.masrofy.app",
+      "permissions": [
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.WAKE_LOCK",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "adaptiveIcon": {
+        "backgroundColor": "#10B981",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "526a336a-15d9-42a5-a021-5ba66be789de"
+      }
+    },
+    "owner": "placeboss-team",
+    "plugins": [
+      "expo-sharing",
+      "expo-font",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#10B981"
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "يسمح لتطبيق مصروفي باستخدام الميكروفون لتسجيل المصروفات صوتياً."
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": false,
+            "extraProguardRules": "-keep class expo.modules.** { *; }\n-keep class expo.modules.kotlin.** { *; }\n-dontwarn expo.modules.**\n-dontwarn expo.modules.kotlin.**\n-dontwarn expo.modules.av.**\n-keep class com.swmansion.reanimated.** { *; }\n-keep class com.facebook.react.turbomodule.** { *; }\n-dontwarn org.apache.poi.**\n-dontwarn org.apache.commons.**"
+          }
+        }
+      ]
+    ]
+  }
+}
