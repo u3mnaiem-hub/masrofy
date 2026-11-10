@@ -9,6 +9,7 @@ LogBox.ignoreLogs([
   'Push notifications (remote notifications) are unavailable in Expo Go',
 ]);
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Font from 'expo-font';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ExpenseProvider, useExpense } from './src/context/ExpenseContext';
 import { HomeScreen } from './src/screens/HomeScreen';
@@ -123,6 +124,29 @@ function MainApp() {
 }
 
 export default function App() {
+  const [fontsLoaded, setFontsLoaded] = useState(false);
+
+  React.useEffect(() => {
+    async function prepare() {
+      try {
+        await Font.loadAsync(MaterialCommunityIcons.font);
+      } catch (e) {
+        console.warn('Font load error:', e);
+      } finally {
+        setFontsLoaded(true);
+      }
+    }
+    prepare();
+  }, []);
+
+  if (!fontsLoaded) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#0F172A', justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ color: '#10B981', fontSize: 22, fontWeight: 'bold' }}>مصروفي</Text>
+      </View>
+    );
+  }
+
   return (
     <SafeAreaProvider>
       <ExpenseProvider>
