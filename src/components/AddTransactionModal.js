@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Modal,
   View,
@@ -19,7 +19,15 @@ import {
   PAYMENT_METHODS,
 } from '../constants/categories';
 import { useExpense } from '../context/ExpenseContext';
-import { speakText, stopSpeech, parseSpokenExpense, extractAmountFromText } from '../utils/voiceAssistant';
+import {
+  speakText,
+  stopSpeech,
+  parseSpokenExpense,
+  extractAmountFromText,
+  startNativeVoiceListening,
+  stopNativeVoiceListening,
+  subscribeVoiceEvents,
+} from '../utils/voiceAssistant';
 
 export const AddTransactionModal = ({
   visible,
@@ -59,8 +67,68 @@ export const AddTransactionModal = ({
   const [voiceStepPrompt, setVoiceStepPrompt] = useState('');
   const [voiceStepInput, setVoiceStepInput] = useState('');
   const [voiceStepPlaceholder, setVoiceStepPlaceholder] = useState('');
+  const [isListeningVoice, setIsListeningVoice] = useState(false);
+  const [voiceListenTarget, setVoiceListenTarget] = useState(null); // 'oneLine' | 'wizard'
+  const [voiceLiveStatus, setVoiceLiveStatus] = useState('');
   const [newCatModalVisible, setNewCatModalVisible] = useState(false);
   const [newCatName, setNewCatName] = useState('');
+
+  const voiceTargetRef = useRef(null);
+  const onVoiceResultRef = useRef(null);
+  const autoListenTimerRef = useRef(null);
+
+  useEffect(() => {
+    voiceTargetRef.current = voiceListenTarget;
+  }, [voiceListenTarget]);
+
+  useEffect(() => {
+    if (!visible) {
+      if (autoListenTimerRef.current) clearTimeout(autoListenTimerRef.current);
+      stopNativeVoiceListening();
+      stopSpeech();
+      setIsListeningVoice(false);
+      setVoiceListenTarget(null);
+      setVoiceStep(0);
+      setVoiceLiveStatus('');
+    }
+  }, [visible]);
+
+  useEffect(() => {
+    const unsub = subscribeVoiceEvents({
+      onReady: () => {
+        setIsListeningVoice(true);
+        setVoiceLiveStatus(isArabic ? '🎙️ أنصت لصوتك الآن...' : '🎙️ Listening...');
+      },
+      onPartial: (partialText) => {
+        if (partialText) {
+          setVoiceLiveStatus(partialText);
+          if (voiceTargetRef.current === 'oneLine') {
+            setOneLineSentence(partialText);
+          } else if (voiceTargetRef.current === 'wizard') {
+            setVoiceStepInput(partialText);
+          }
+        }
+      },
+      onResult: (finalText) => {
+        setIsListeningVoice(false);
+        setVoiceLiveStatus('');
+        if (onVoiceResultRef.current) {
+          onVoiceResultRef.current(finalText);
+        }
+      },
+      onError: (err) => {
+        setIsListeningVoice(false);
+        setVoiceLiveStatus(err?.message || '');
+      },
+      onEnd: () => {
+        setIsListeningVoice(false);
+      },
+    });
+    return () => {
+      if (autoListenTimerRef.current) clearTimeout(autoListenTimerRef.current);
+      unsub();
+    };
+  }, [isArabic]);
 
   // Build the list of all Credit Cards (built-in CCs + custom CCs)
   const availableCreditCards = [
@@ -179,125 +247,175 @@ export const AddTransactionModal = ({
     }
   };
 
+  const beginListening = async (target) => {
+    try {
+      stopSpeech();
+      setVoiceListenTarget(target);
+      voiceTargetRef.current = target;
+      setVoiceLiveStatus(isArabic ? 'جاري تشغيل الميكروفون...' : 'Starting mic...');
+      await startNativeVoiceListening(isArabic ? 'ar-EG' : 'en-US');
+    } catch (err) {
+      setIsListeningVoice(false);
+      setVoiceLiveStatus('');
+      Alert.alert(
+        isArabic ? 'تنبيه' : 'Alert',
+        err?.message || (isArabic ? 'تعذر تشغيل الميكروفون' : 'Unable to start microphone')
+      );
+    }
+  };
+
+  const scheduleWizardListen = (delayMs = 1400) => {
+    if (autoListenTimerRef.current) clearTimeout(autoListenTimerRef.current);
+    autoListenTimerRef.current = setTimeout(() => {
+      beginListening('wizard');
+    }, delayMs);
+  };
+
   // Single-sentence One-Shot Voice Dictation (إملاء سطر واحد ينفذ كل شيء دفعة واحدة)
-  const handleExecuteOneLineVoice = () => {
-    const text = (oneLineSentence || '').trim();
+  const handleExecuteOneLineVoice = (spokenOverride) => {
+    const text = (typeof spokenOverride === 'string' ? spokenOverride : oneLineSentence || '').trim();
     if (!text) {
       Alert.alert(
         isArabic ? 'تنبيه' : 'Alert',
         isArabic
-          ? 'يرجى نطق أو كتابة المعاملة كاملة عبر مايكروفون الكيبورد\nمثال: "بنزين 300 كاش" أو "غداء 150 البنك"'
-          : 'Please speak or type the full expense e.g. "Lunch 150 cash" or "Petrol 300 card"'
+          ? 'اضغط على الميكروفون أو اكتب المعاملة كاملة\nمثال: "100 جنيه بنزين كاش" أو "100 جنيه بنزين كريديت كارد"'
+          : 'Tap the mic or type the full expense e.g. "100 petrol cash"'
       );
       return;
     }
-    const parsed = parseSpokenExpense(text);
-    if (parsed.amount > 0) {
+    setOneLineSentence(text);
+    const categoriesList = allExpenseCategories || EXPENSE_CATEGORIES;
+    const pmList = allPaymentMethods || PAYMENT_METHODS;
+    const parsed = parseSpokenExpense(text, categoriesList, pmList);
+
+    if (parsed.amount && parsed.amount > 0) {
       setAmount(String(parsed.amount));
     }
-    if (parsed.matchedCategory) {
-      setCategoryId(parsed.matchedCategory.id);
+    const nextCatId = parsed.categoryId || parsed.matchedCategory?.id || categoryId;
+    if (parsed.categoryId || parsed.matchedCategory?.id) {
+      setCategoryId(nextCatId);
     }
-    if (parsed.matchedPaymentMethod) {
-      setPaymentMethod(parsed.matchedPaymentMethod.id);
+    const nextPmId = parsed.paymentMethod || parsed.matchedPaymentMethod?.id || paymentMethod;
+    if (parsed.paymentMethod || parsed.matchedPaymentMethod?.id) {
+      setPaymentMethod(nextPmId);
     }
     if (parsed.note) {
       setNote(parsed.note);
     }
 
-    const catObj = (allExpenseCategories || EXPENSE_CATEGORIES).find(
-      (c) => c.id === (parsed.matchedCategory?.id || categoryId)
-    );
+    const catObj = categoriesList.find((c) => c.id === nextCatId);
     const catName = isArabic ? (catObj?.nameAr || catObj?.name || 'مصروف') : (catObj?.name || 'expense');
-    const pmObj = (allPaymentMethods || PAYMENT_METHODS).find(
-      (p) => p.id === (parsed.matchedPaymentMethod?.id || paymentMethod)
-    );
+    const pmObj = pmList.find((p) => p.id === nextPmId);
     const pmName = isArabic
       ? (pmObj?.shortNameAr || pmObj?.nameAr || 'كاش')
       : (pmObj?.shortName || pmObj?.name || 'Cash');
 
     const speakMsg = isArabic
-      ? `تم استخراج ${parsed.amount > 0 ? parsed.amount + ' جنيه' : ''} ${catName} ${pmName}`
-      : `Extracted ${parsed.amount} ${catName} ${pmName}`;
-    speakText(speakMsg, { language: 'ar' });
+      ? `تم إدخال ${parsed.amount > 0 ? parsed.amount + ' جنيه' : ''} ${catName} ${pmName}`
+      : `Filled ${parsed.amount || ''} ${catName} ${pmName}`;
+    speakText(speakMsg, { language: isArabic ? 'ar' : 'en' });
   };
 
-  // Interactive Voice-Dictated Entry Step-by-Step
+  // Interactive Voice-Dictated Entry Step-by-Step (Auto-advances & auto-listens!)
   const startVoiceWizard = () => {
     setVoiceStep(1);
     setVoiceStepInput('');
+    setVoiceListenTarget('wizard');
+    voiceTargetRef.current = 'wizard';
     const prompt = isArabic ? 'كم المبلغ الذي تريد تسجيله؟' : 'How much is the amount?';
     setVoiceStepPrompt(prompt);
-    setVoiceStepPlaceholder(isArabic ? 'اكتب أو أملِ المبلغ (مثال: 150 أو مية وخمسين)' : 'Say or type amount (e.g. 150)');
-    speakText(prompt, { language: 'ar' });
+    setVoiceStepPlaceholder(isArabic ? 'تحدث أو اكتب المبلغ (مثال: 100 أو مية)' : 'Say or type amount (e.g. 100)');
+    speakText(prompt, { language: isArabic ? 'ar' : 'en' });
+    scheduleWizardListen(1300);
   };
 
   const stopVoiceWizard = () => {
+    if (autoListenTimerRef.current) clearTimeout(autoListenTimerRef.current);
+    stopNativeVoiceListening();
+    setIsListeningVoice(false);
+    setVoiceListenTarget(null);
     setVoiceStep(0);
     setVoiceStepInput('');
+    setVoiceLiveStatus('');
     stopSpeech();
   };
 
   const speakCurrentStepPrompt = () => {
     if (voiceStepPrompt) {
-      speakText(voiceStepPrompt, { language: 'ar' });
+      speakText(voiceStepPrompt, { language: isArabic ? 'ar' : 'en' });
     }
   };
 
-  const handleAdvanceVoiceStep = async () => {
+  const handleAdvanceVoiceStep = async (spokenOverride) => {
+    const inputVal = (typeof spokenOverride === 'string' ? spokenOverride : voiceStepInput || '').trim();
+    const categoriesList = allExpenseCategories || EXPENSE_CATEGORIES;
+    const pmList = allPaymentMethods || PAYMENT_METHODS;
+
     if (voiceStep === 1) {
-      // Step 1: Amount -> Move automatically to Step 2 (Category)
-      const parsedAmt = extractAmountFromText(voiceStepInput) || parseFloat(amount);
+      // Step 1: Amount -> Fill Amount & Auto-Move to Step 2 (Category)
+      const parsedAmt = extractAmountFromText(inputVal) || parseFloat(amount);
       if (parsedAmt && parsedAmt > 0) {
         setAmount(String(parsedAmt));
         setVoiceStep(2);
         setVoiceStepInput('');
-        const prompt = isArabic ? `تم تسجيل ${parsedAmt} ${currency.symbol}. ما هو بند المصروف؟ (مثل: طعام، بنزين، فواتير)` : `Amount is ${parsedAmt}. What is the category?`;
+        const prompt = isArabic
+          ? `تم تسجيل ${parsedAmt} ${currency.symbol}. ما هو بند المصروف؟ مثل بنزين أو طعام أو فواتير`
+          : `Amount is ${parsedAmt}. What is the category?`;
         setVoiceStepPrompt(prompt);
-        setVoiceStepPlaceholder(isArabic ? 'أملِ أو اكتب البند (مثال: طعام، بنزين)' : 'Say or type category');
-        speakText(prompt, { language: 'ar' });
+        setVoiceStepPlaceholder(isArabic ? 'تحدث أو اكتب البند (مثال: بنزين، طعام)' : 'Say or type category');
+        speakText(prompt, { language: isArabic ? 'ar' : 'en' });
+        scheduleWizardListen(2200);
       } else {
-        const errorMsg = isArabic ? 'يرجى إملاء أو كتابة المبلغ أولاً' : 'Please specify the amount first';
-        speakText(errorMsg, { language: 'ar' });
+        const errorMsg = isArabic ? 'يرجى نطق أو كتابة المبلغ أولاً' : 'Please say or type the amount first';
+        speakText(errorMsg, { language: isArabic ? 'ar' : 'en' });
+        scheduleWizardListen(1500);
       }
     } else if (voiceStep === 2) {
-      // Step 2: Category -> Move automatically to Step 3 (Payment Method)
-      const parsed = parseSpokenExpense(voiceStepInput);
+      // Step 2: Category -> Select Category & Auto-Move to Step 3 (Payment Method)
+      const parsed = parseSpokenExpense(inputVal, categoriesList, pmList);
       let selectedCat = categoryId;
-      if (parsed.matchedCategory) {
-        setCategoryId(parsed.matchedCategory.id);
-        selectedCat = parsed.matchedCategory.id;
+      if (parsed.categoryId || parsed.matchedCategory?.id) {
+        selectedCat = parsed.categoryId || parsed.matchedCategory.id;
+        setCategoryId(selectedCat);
+      }
+      if (parsed.note) {
+        setNote(parsed.note);
       }
       setVoiceStep(3);
       setVoiceStepInput('');
-      const catObj = (allExpenseCategories || EXPENSE_CATEGORIES).find(c => c.id === selectedCat);
+      const catObj = categoriesList.find((c) => c.id === selectedCat);
       const cName = isArabic ? (catObj?.nameAr || catObj?.name || 'مصروف') : (catObj?.name || 'expense');
-      const prompt = isArabic ? `اخترنا ${cName}. ما هي طريقة الدفع؟ (كاش، البنك، أم فيزا؟)` : `Category is ${cName}. Payment method?`;
+      const prompt = isArabic
+        ? `تم اختيار ${cName}. ما هي طريقة الدفع؟ كاش أم كريديت كارد أم بنك؟`
+        : `Category is ${cName}. Payment method?`;
       setVoiceStepPrompt(prompt);
-      setVoiceStepPlaceholder(isArabic ? 'أملِ أو اكتب طريقة الدفع (كاش، بنك، فيزا)' : 'Say or type payment method');
-      speakText(prompt, { language: 'ar' });
+      setVoiceStepPlaceholder(isArabic ? 'تحدث أو اكتب طريقة الدفع (كاش، كريديت، بنك)' : 'Say or type payment method');
+      speakText(prompt, { language: isArabic ? 'ar' : 'en' });
+      scheduleWizardListen(2200);
     } else if (voiceStep === 3) {
       // Step 3: Payment Method -> Auto-save & finish!
-      const parsed = parseSpokenExpense(voiceStepInput);
+      const parsed = parseSpokenExpense(inputVal, categoriesList, pmList);
       let finalPm = paymentMethod;
-      if (parsed.matchedPaymentMethod) {
-        setPaymentMethod(parsed.matchedPaymentMethod.id);
-        finalPm = parsed.matchedPaymentMethod.id;
+      if (parsed.paymentMethod || parsed.matchedPaymentMethod?.id) {
+        finalPm = parsed.paymentMethod || parsed.matchedPaymentMethod.id;
+        setPaymentMethod(finalPm);
       }
+      if (autoListenTimerRef.current) clearTimeout(autoListenTimerRef.current);
       setVoiceStep(0);
       setVoiceStepInput('');
-      const pmObj = (allPaymentMethods || PAYMENT_METHODS).find(p => p.id === finalPm);
+      setVoiceListenTarget(null);
+      const pmObj = pmList.find((p) => p.id === finalPm);
       const pmName = isArabic ? (pmObj?.shortNameAr || pmObj?.nameAr || 'كاش') : (pmObj?.shortName || pmObj?.name || 'Cash');
-      const catObj = (allExpenseCategories || EXPENSE_CATEGORIES).find(c => c.id === categoryId);
+      const catObj = categoriesList.find((c) => c.id === categoryId);
       const cName = isArabic ? (catObj?.nameAr || catObj?.name || 'مصروف') : (catObj?.name || 'expense');
-      
+
       const numAmt = parseFloat(amount);
       if (numAmt > 0) {
         const finalMsg = isArabic
           ? `تم بنجاح! تم حفظ ${numAmt} ${currency.symbol} لبند ${cName} عبر ${pmName}.`
           : `Saved! ${numAmt} ${currency.symbol} for ${cName} via ${pmName}.`;
-        speakText(finalMsg, { language: 'ar' });
-        
+        speakText(finalMsg, { language: isArabic ? 'ar' : 'en' });
+
         await addTransaction({
           type: 'expense',
           amount: numAmt,
@@ -311,8 +429,16 @@ export const AddTransactionModal = ({
         const finalMsg = isArabic
           ? `تم تجهيز بند ${cName} وطريقة الدفع ${pmName}.`
           : `Ready! Selected ${cName} and ${pmName}.`;
-        speakText(finalMsg, { language: 'ar' });
+        speakText(finalMsg, { language: isArabic ? 'ar' : 'en' });
       }
+    }
+  };
+
+  onVoiceResultRef.current = (spokenText) => {
+    if (voiceTargetRef.current === 'oneLine') {
+      handleExecuteOneLineVoice(spokenText);
+    } else if (voiceTargetRef.current === 'wizard') {
+      handleAdvanceVoiceStep(spokenText);
     }
   };
 
@@ -721,6 +847,136 @@ export const AddTransactionModal = ({
             {/* ===== MODE 2: مصروف عادي (REGULAR EXPENSE) ===== */}
             {mode === 'expense' && (
               <>
+                {/* Smart Voice Dictation Card (One-Shot & Auto-Advancing Step-by-Step) */}
+                <View style={styles.smartVoiceCard}>
+                  <View style={[styles.smartVoiceHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+                    <MaterialCommunityIcons name="microphone-outline" size={18} color="#6D28D9" />
+                    <Text style={styles.smartVoiceTitle}>
+                      {isArabic ? 'المساعد الصوتي الذكي (بالعامية المصرية)' : 'Smart Voice Dictation'}
+                    </Text>
+                    {isListeningVoice && (
+                      <View style={styles.listeningPill}>
+                        <Text style={styles.listeningPillText}>
+                          {isArabic ? 'بيسمعك...' : 'Listening...'}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* One-Shot Full Sentence Input + Live Mic */}
+                  <View style={[styles.voiceStepInputRow, isArabic && { flexDirection: 'row-reverse' }]}>
+                    <TouchableOpacity
+                      style={[
+                        styles.voiceMicBtn,
+                        isListeningVoice && voiceListenTarget === 'oneLine' && styles.voiceMicBtnActive,
+                      ]}
+                      onPress={() => {
+                        if (isListeningVoice && voiceListenTarget === 'oneLine') {
+                          stopNativeVoiceListening();
+                          setIsListeningVoice(false);
+                        } else {
+                          beginListening('oneLine');
+                        }
+                      }}
+                    >
+                      <MaterialCommunityIcons
+                        name={isListeningVoice && voiceListenTarget === 'oneLine' ? 'microphone-off' : 'microphone'}
+                        size={20}
+                        color="#FFFFFF"
+                      />
+                    </TouchableOpacity>
+                    <TextInput
+                      style={[styles.voiceStepInput, isArabic && { textAlign: 'right' }]}
+                      placeholder={isArabic ? 'مثال: 100 جنيه بنزين كاش' : 'e.g. 100 petrol cash'}
+                      placeholderTextColor="#94A3B8"
+                      value={oneLineSentence}
+                      onChangeText={setOneLineSentence}
+                      onSubmitEditing={() => handleExecuteOneLineVoice()}
+                    />
+                    <TouchableOpacity
+                      style={styles.voiceNextStepBtn}
+                      onPress={() => handleExecuteOneLineVoice()}
+                    >
+                      <Text style={styles.voiceNextStepBtnText}>
+                        {isArabic ? 'تطبيق' : 'Fill'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {!!voiceLiveStatus && (
+                    <Text style={[styles.voiceLiveStatusText, isArabic && { textAlign: 'right' }]}>
+                      {voiceLiveStatus}
+                    </Text>
+                  )}
+
+                  {/* Auto-Advancing Step-by-Step Voice Wizard */}
+                  {voiceStep === 0 ? (
+                    <TouchableOpacity style={styles.startWizardBtn} onPress={startVoiceWizard}>
+                      <MaterialCommunityIcons name="auto-fix" size={16} color="#5B21B6" />
+                      <Text style={styles.startWizardBtnText}>
+                        {isArabic
+                          ? 'إملاء خطوة بخطوة (يملا المبلغ ثم البند ثم الدفع تلقائياً)'
+                          : 'Step-by-step Auto-Advancing Voice Wizard'}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={styles.activeVoiceStepBox}>
+                      <View style={styles.stepDotsRow}>
+                        {[1, 2, 3].map((stepNum, idx) => (
+                          <React.Fragment key={stepNum}>
+                            <View style={[styles.stepDot, voiceStep >= stepNum && styles.stepDotActive]}>
+                              <Text style={styles.stepDotNum}>{stepNum}</Text>
+                            </View>
+                            {idx < 2 && (
+                              <View style={[styles.stepLine, voiceStep > stepNum && styles.stepLineActive]} />
+                            )}
+                          </React.Fragment>
+                        ))}
+                      </View>
+
+                      <View style={[styles.promptSpeechRow, isArabic && { flexDirection: 'row-reverse' }]}>
+                        <TouchableOpacity onPress={speakCurrentStepPrompt} style={styles.replaySpeechBtn}>
+                          <MaterialCommunityIcons name="volume-high" size={16} color="#6D28D9" />
+                        </TouchableOpacity>
+                        <Text style={[styles.promptSpeechText, isArabic && { textAlign: 'right' }]}>
+                          {voiceStepPrompt}
+                        </Text>
+                        <TouchableOpacity onPress={stopVoiceWizard}>
+                          <MaterialCommunityIcons name="close-circle" size={20} color="#EF4444" />
+                        </TouchableOpacity>
+                      </View>
+
+                      <View style={[styles.voiceStepInputRow, isArabic && { flexDirection: 'row-reverse' }]}>
+                        <TouchableOpacity
+                          style={[
+                            styles.voiceMicBtn,
+                            isListeningVoice && voiceListenTarget === 'wizard' && styles.voiceMicBtnActive,
+                          ]}
+                          onPress={() => beginListening('wizard')}
+                        >
+                          <MaterialCommunityIcons name="microphone" size={18} color="#FFFFFF" />
+                        </TouchableOpacity>
+                        <TextInput
+                          style={[styles.voiceStepInput, isArabic && { textAlign: 'right' }]}
+                          placeholder={voiceStepPlaceholder}
+                          placeholderTextColor="#94A3B8"
+                          value={voiceStepInput}
+                          onChangeText={setVoiceStepInput}
+                          onSubmitEditing={() => handleAdvanceVoiceStep()}
+                        />
+                        <TouchableOpacity
+                          style={styles.voiceNextStepBtn}
+                          onPress={() => handleAdvanceVoiceStep()}
+                        >
+                          <Text style={styles.voiceNextStepBtnText}>
+                            {voiceStep === 3 ? (isArabic ? 'حفظ' : 'Save') : (isArabic ? 'التالي' : 'Next')}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+                </View>
+
                 {/* Amount Input */}
                 <View style={styles.amountInputContainer}>
                   <TextInput
@@ -1674,6 +1930,69 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: '#DDD6FE',
+  },
+  smartVoiceCard: {
+    backgroundColor: '#F5F3FF',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+  },
+  smartVoiceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  smartVoiceTitle: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#5B21B6',
+  },
+  listeningPill: {
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  listeningPillText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  voiceMicBtn: {
+    backgroundColor: '#7C3AED',
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  voiceMicBtnActive: {
+    backgroundColor: '#EF4444',
+  },
+  voiceLiveStatusText: {
+    fontSize: 11,
+    color: '#6D28D9',
+    marginBottom: 6,
+    fontWeight: '600',
+  },
+  startWizardBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#EDE9FE',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+  },
+  startWizardBtnText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#5B21B6',
   },
   stepDotsRow: {
     flexDirection: 'row',
