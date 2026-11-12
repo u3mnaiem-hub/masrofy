@@ -132,6 +132,10 @@ class VoiceInputModule(private val reactContext: ReactApplicationContext) :
                     putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, lang)
                     putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
                     putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+                    // Give generous silence timeouts so user has plenty of time to finish speaking
+                    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 4000L)
+                    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 3000L)
+                    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 5000L)
                 }
 
                 recognizer.startListening(intent)

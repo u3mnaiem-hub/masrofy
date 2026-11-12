@@ -47,6 +47,7 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [modalType, setModalType] = useState('expense');
   const [modalTargetCard, setModalTargetCard] = useState('cc_ar');
+  const [editingTransaction, setEditingTransaction] = useState(null);
   const [cycleModalVisible, setCycleModalVisible] = useState(false);
   const [rolloverModalVisible, setRolloverModalVisible] = useState(false);
   const [banksModalVisible, setBanksModalVisible] = useState(false);
@@ -137,7 +138,7 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
               <TouchableOpacity
                 style={[
                   styles.settingsHeaderBtn,
-                  { backgroundColor: isDarkMode ? '#1E1E1E' : '#F1F5F9', borderColor: isDarkMode ? '#333333' : '#E2E8F0' },
+                  { backgroundColor: isDarkMode ? themeColors.surfaceSecondary : '#F1F5F9', borderColor: isDarkMode ? themeColors.border : '#E2E8F0' },
                 ]}
                 onPress={toggleDarkMode}
                 activeOpacity={0.7}
@@ -153,7 +154,7 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
                 <TouchableOpacity
                   style={[
                     styles.settingsHeaderBtn,
-                    { backgroundColor: isDarkMode ? '#1E1E1E' : '#F1F5F9', borderColor: isDarkMode ? '#333333' : '#E2E8F0' },
+                    { backgroundColor: isDarkMode ? themeColors.surfaceSecondary : '#F1F5F9', borderColor: isDarkMode ? themeColors.border : '#E2E8F0' },
                   ]}
                   onPress={onNavigateToSettings}
                   activeOpacity={0.7}
@@ -179,72 +180,107 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
               style={[
                 styles.syncBtn,
                 {
-                  backgroundColor: isDarkMode ? '#271B38' : '#FAF5FF',
-                  borderColor: isDarkMode ? '#6B21A8' : '#D8B4FE',
+                  backgroundColor: isDarkMode ? themeColors.purpleLight : '#FAF5FF',
+                  borderColor: isDarkMode ? '#5B4B8A' : '#D8B4FE',
                   paddingHorizontal: 9,
                 },
               ]}
               onPress={() => setManageCategoriesVisible(true)}
               activeOpacity={0.7}
             >
-              <MaterialCommunityIcons name="shape-outline" size={15} color={isDarkMode ? '#C084FC' : '#7C3AED'} />
-              <Text style={[styles.syncBtnText, { color: isDarkMode ? '#C084FC' : '#7C3AED', fontWeight: '800' }]}>
+              <MaterialCommunityIcons name="shape-outline" size={15} color={isDarkMode ? themeColors.purple : '#7C3AED'} />
+              <Text style={[styles.syncBtnText, { color: isDarkMode ? themeColors.purple : '#7C3AED', fontWeight: '800' }]}>
                 {isArabic ? 'إدارة وحذف البنود 🏷️' : 'Manage Categories 🏷️'}
               </Text>
             </TouchableOpacity>
             {/* Instant Language Switcher Button (EN <-> AR) */}
             <TouchableOpacity
-              style={[styles.syncBtn, { backgroundColor: '#EEF2FF', borderColor: '#C7D2FE', paddingHorizontal: 8 }]}
+              style={[
+                styles.syncBtn,
+                {
+                  backgroundColor: isDarkMode ? themeColors.indigoLight : '#EEF2FF',
+                  borderColor: isDarkMode ? '#4B5282' : '#C7D2FE',
+                  paddingHorizontal: 8,
+                },
+              ]}
               onPress={toggleLanguage}
               activeOpacity={0.7}
             >
-              <MaterialCommunityIcons name="translate" size={15} color="#4F46E5" />
-              <Text style={[styles.syncBtnText, { color: '#4F46E5' }]}>
+              <MaterialCommunityIcons name="translate" size={15} color={isDarkMode ? themeColors.indigo : '#4F46E5'} />
+              <Text style={[styles.syncBtnText, { color: isDarkMode ? themeColors.indigo : '#4F46E5' }]}>
                 {isArabic ? 'English' : 'عربي'}
               </Text>
             </TouchableOpacity>
 
             {/* Quick "ترحيل وشهر جديد" Button */}
             <TouchableOpacity
-              style={[styles.syncBtn, { backgroundColor: '#EFF6FF', borderColor: '#2563EB', paddingHorizontal: 9 }]}
+              style={[
+                styles.syncBtn,
+                {
+                  backgroundColor: isDarkMode ? themeColors.infoLight : '#EFF6FF',
+                  borderColor: isDarkMode ? '#3B5984' : '#2563EB',
+                  paddingHorizontal: 9,
+                },
+              ]}
               onPress={handleOpenRollover}
               activeOpacity={0.7}
             >
-              <MaterialCommunityIcons name="calendar-sync" size={15} color="#1D4ED8" />
-              <Text style={[styles.syncBtnText, { color: '#1D4ED8', fontWeight: '800' }]}>
+              <MaterialCommunityIcons name="calendar-sync" size={15} color={isDarkMode ? themeColors.info : '#1D4ED8'} />
+              <Text style={[styles.syncBtnText, { color: isDarkMode ? themeColors.info : '#1D4ED8', fontWeight: '800' }]}>
                 {isArabic ? 'ترحيل وشهر جديد' : 'Rollover Month'}
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.syncBtn, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0', paddingHorizontal: 8 }]}
+              style={[
+                styles.syncBtn,
+                {
+                  backgroundColor: isDarkMode ? themeColors.primaryLight : '#F0FDF4',
+                  borderColor: isDarkMode ? '#2D6A56' : '#BBF7D0',
+                  paddingHorizontal: 8,
+                },
+              ]}
               onPress={() => setBanksModalVisible(true)}
               activeOpacity={0.7}
             >
-              <MaterialCommunityIcons name="bank-plus" size={15} color="#059669" />
-              <Text style={[styles.syncBtnText, { color: '#059669' }]}>
+              <MaterialCommunityIcons name="bank-plus" size={15} color={isDarkMode ? themeColors.primary : '#059669'} />
+              <Text style={[styles.syncBtnText, { color: isDarkMode ? themeColors.primary : '#059669' }]}>
                 {isArabic ? '+ بنك/كارت' : '+ Bank/Card'}
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.syncBtn, { backgroundColor: '#FEF2F2', borderColor: '#FECACA', paddingHorizontal: 8 }]}
+              style={[
+                styles.syncBtn,
+                {
+                  backgroundColor: isDarkMode ? themeColors.expenseLight : '#FEF2F2',
+                  borderColor: isDarkMode ? '#7A3E43' : '#FECACA',
+                  paddingHorizontal: 8,
+                },
+              ]}
               onPress={() => setDueReminderVisible(true)}
               activeOpacity={0.7}
             >
               <MaterialCommunityIcons
                 name={alertPrefs?.startupAlertEnabled === false && alertPrefs?.phoneNotificationsEnabled === false ? 'bell-off-outline' : 'bell-ring-outline'}
                 size={15}
-                color="#DC2626"
+                color={isDarkMode ? themeColors.expense : '#DC2626'}
               />
-              <Text style={[styles.syncBtnText, { color: '#DC2626' }]}>
+              <Text style={[styles.syncBtnText, { color: isDarkMode ? themeColors.expense : '#DC2626' }]}>
                 {isArabic ? 'التنبيه' : 'CC Alert'}
               </Text>
             </TouchableOpacity>
 
             {/* Instant Voice Query for Today & Yesterday */}
             <TouchableOpacity
-              style={[styles.syncBtn, { backgroundColor: '#F5F3FF', borderColor: '#DDD6FE', paddingHorizontal: 9 }]}
+              style={[
+                styles.syncBtn,
+                {
+                  backgroundColor: isDarkMode ? themeColors.purpleLight : '#F5F3FF',
+                  borderColor: isDarkMode ? '#5B4B8A' : '#DDD6FE',
+                  paddingHorizontal: 9,
+                },
+              ]}
               onPress={() => setVoiceQueryVisible(true)}
               activeOpacity={0.7}
             >
@@ -421,7 +457,15 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
 
               {recentTransactions.length > 0 ? (
                 recentTransactions.map((tx) => (
-                  <TransactionItem key={tx.id} item={tx} />
+                  <TransactionItem
+                    key={tx.id}
+                    item={tx}
+                    onEdit={(selectedTx) => {
+                      setEditingTransaction(selectedTx);
+                      setModalType(selectedTx.type || 'expense');
+                      setModalVisible(true);
+                    }}
+                  />
                 ))
               ) : (
                 <View style={styles.emptyContainer}>
@@ -449,12 +493,16 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
           onClose={() => setManageCategoriesVisible(false)}
         />
 
-        {/* Add Modal */}
+        {/* Add / Edit Modal */}
         <AddTransactionModal
           visible={modalVisible}
           initialType={modalType}
           initialTargetCard={modalTargetCard}
-          onClose={() => setModalVisible(false)}
+          editingTransaction={editingTransaction}
+          onClose={() => {
+            setModalVisible(false);
+            setEditingTransaction(null);
+          }}
         />
 
         {/* Cycle & Starting Balances Modal */}

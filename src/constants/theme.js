@@ -47,49 +47,49 @@ export const COLORS = {
 export const LIGHT_COLORS = { ...COLORS };
 
 export const DARK_COLORS = {
-  // Brand colors
-  primary: '#10B981',
-  primaryDark: '#059669',
-  primaryLight: '#064E3B',
-  primaryUltraLight: '#022C22',
+  // Brand colors (softened for comfortable dark-gray mode)
+  primary: '#34D399',
+  primaryDark: '#10B981',
+  primaryLight: '#1E3A32',
+  primaryUltraLight: '#1B2E29',
 
   // Semantic
   expense: '#F87171',
-  expenseLight: '#450A0A',
-  expenseDark: '#DC2626',
+  expenseLight: '#3B2326',
+  expenseDark: '#EF4444',
 
-  income: '#34D399',
-  incomeLight: '#064E3B',
-  incomeDark: '#059669',
+  income: '#4ADE80',
+  incomeLight: '#1E3A32',
+  incomeDark: '#22C55E',
 
   warning: '#FBBF24',
-  warningLight: '#451A03',
+  warningLight: '#3A301F',
 
   info: '#60A5FA',
-  infoLight: '#1E3A8A',
+  infoLight: '#233044',
 
-  // Neutrals & Surfaces - PURE PITCH BLACK (OLED True Black)
-  background: '#000000',
-  surface: '#121212',
-  surfaceSecondary: '#1E1E1E',
-  border: '#27272A',
-  borderLight: '#18181B',
+  // Neutrals & Surfaces - Soft Neutral Gray (not harsh black)
+  background: '#222428',
+  surface: '#2C2F35',
+  surfaceSecondary: '#363A42',
+  border: '#454A54',
+  borderLight: '#33373F',
 
   // Typography
-  textPrimary: '#FFFFFF',
-  textSecondary: '#A1A1AA',
-  textMuted: '#71717A',
-  textWhite: '#FFFFFF',
+  textPrimary: '#E5E7EB',
+  textSecondary: '#B4BAC4',
+  textMuted: '#8B929E',
+  textWhite: '#F3F4F6',
 
-  // Accents
+  // Accents (muted so boxes aren't glaring)
   purple: '#A78BFA',
-  purpleLight: '#2E1065',
+  purpleLight: '#2E2842',
   pink: '#F472B6',
-  pinkLight: '#500724',
+  pinkLight: '#3D2535',
   teal: '#2DD4BF',
-  tealLight: '#134E4A',
+  tealLight: '#1F3738',
   indigo: '#818CF8',
-  indigoLight: '#1E1B4B',
+  indigoLight: '#272B42',
 };
 
 export const getThemeColors = (isDarkMode) => (isDarkMode ? DARK_COLORS : COLORS);

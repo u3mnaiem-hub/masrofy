@@ -136,24 +136,24 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
       <View style={styles.accountsGridContainer}>
         {/* Row 1: كاش متاح و DC بنك جنباً إلى جنب */}
         <View style={[styles.blocksPairRow, isArabic && { flexDirection: 'row-reverse' }]}>
-          {/* Block 1: كاش متاح (Cash) - بيج */}
-          <View style={[styles.accountCard, styles.beigeCard, { flex: 1 }, isArabic && { alignItems: 'flex-end' }]}>
+          {/* Block 1: كاش متاح (Cash) */}
+          <View style={[styles.accountCard, styles.beigeCard, isDarkMode && styles.darkBeigeCard, { flex: 1 }, isArabic && { alignItems: 'flex-end' }]}>
             <View style={[styles.accountTop, isArabic && { flexDirection: 'row-reverse' }]}>
               <Text
-                style={[styles.accountName, styles.beigeText, isArabic && { textAlign: 'right' }]}
+                style={[styles.accountName, styles.beigeText, isDarkMode && styles.darkBeigeText, isArabic && { textAlign: 'right' }]}
                 numberOfLines={1}
                 adjustsFontSizeToFit={true}
                 minimumFontScale={0.75}
               >
                 {isArabic ? 'كاش متاح (Cash)' : 'Available Cash'}
               </Text>
-              <MaterialCommunityIcons name="cash" size={15} color="#B45309" />
+              <MaterialCommunityIcons name="cash" size={15} color={isDarkMode ? '#D9B872' : '#B45309'} />
             </View>
-            <Text style={[styles.accountAmount, styles.beigeText]} numberOfLines={1}>
+            <Text style={[styles.accountAmount, styles.beigeText, isDarkMode && styles.darkBeigeText]} numberOfLines={1}>
               {formatAmount(balances.availCsh)} {currency.symbol}
             </Text>
             <Text
-              style={[styles.accountSub, styles.beigeSubText]}
+              style={[styles.accountSub, styles.beigeSubText, isDarkMode && styles.darkBeigeSubText]}
               numberOfLines={1}
               adjustsFontSizeToFit={true}
               minimumFontScale={0.75}
@@ -162,24 +162,24 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
             </Text>
           </View>
 
-          {/* Block 2: DC / حساب بنكي - بيج بنفس الفونت تماماً */}
-          <View style={[styles.accountCard, styles.beigeCard, { flex: 1 }, isArabic && { alignItems: 'flex-end' }]}>
+          {/* Block 2: DC / حساب بنكي */}
+          <View style={[styles.accountCard, styles.beigeCard, isDarkMode && styles.darkBeigeCard, { flex: 1 }, isArabic && { alignItems: 'flex-end' }]}>
             <View style={[styles.accountTop, isArabic && { flexDirection: 'row-reverse' }]}>
               <Text
-                style={[styles.accountName, styles.beigeText, isArabic && { textAlign: 'right' }]}
+                style={[styles.accountName, styles.beigeText, isDarkMode && styles.darkBeigeText, isArabic && { textAlign: 'right' }]}
                 numberOfLines={1}
                 adjustsFontSizeToFit={true}
                 minimumFontScale={0.75}
               >
                 {isArabic ? 'DC / حساب بنكي' : 'DC / Bank'}
               </Text>
-              <MaterialCommunityIcons name="credit-card" size={15} color="#B45309" />
+              <MaterialCommunityIcons name="credit-card" size={15} color={isDarkMode ? '#D9B872' : '#B45309'} />
             </View>
-            <Text style={[styles.accountAmount, styles.beigeText]} numberOfLines={1}>
+            <Text style={[styles.accountAmount, styles.beigeText, isDarkMode && styles.darkBeigeText]} numberOfLines={1}>
               {formatAmount(balances.availDc)} {currency.symbol}
             </Text>
             <Text
-              style={[styles.accountSub, styles.beigeSubText]}
+              style={[styles.accountSub, styles.beigeSubText, isDarkMode && styles.darkBeigeSubText]}
               numberOfLines={1}
               adjustsFontSizeToFit={true}
               minimumFontScale={0.75}
@@ -191,15 +191,15 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
 
         {/* Row 2: أجريكول والعربي جنباً إلى جنب تحتهما مباشرة */}
         <View style={[styles.blocksPairRow, isArabic && { flexDirection: 'row-reverse' }]}>
-          {/* Block 3: كريدي أجريكول (CC CA) - أخضر فاتح وفونت أخضر غامق */}
+          {/* Block 3: كريدي أجريكول (CC CA) */}
           <TouchableOpacity
-            style={[styles.accountCard, styles.greenCaCard, { flex: 1 }, isArabic && { alignItems: 'flex-end' }]}
+            style={[styles.accountCard, styles.greenCaCard, isDarkMode && styles.darkGreenCaCard, { flex: 1 }, isArabic && { alignItems: 'flex-end' }]}
             onPress={() => onOpenPayCc && onOpenPayCc('cc_ca')}
             activeOpacity={0.75}
           >
             <View style={[styles.accountTop, isArabic && { flexDirection: 'row-reverse' }]}>
               <Text
-                style={[styles.accountName, styles.greenCaText, isArabic && { textAlign: 'right' }]}
+                style={[styles.accountName, styles.greenCaText, isDarkMode && styles.darkGreenCaText, isArabic && { textAlign: 'right' }]}
                 numberOfLines={1}
                 adjustsFontSizeToFit={true}
                 minimumFontScale={0.75}
@@ -207,17 +207,17 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
                 {isArabic ? 'أجريكول (CC CA)' : 'Crédit Agricole'}
               </Text>
               <View style={[styles.payBadgeRow, isArabic && { flexDirection: 'row-reverse' }]}>
-                <View style={styles.payBadgeGreen}>
-                  <Text style={styles.payBadgeGreenText}>{isArabic ? 'سداد 💳' : 'Pay'}</Text>
+                <View style={[styles.payBadgeGreen, isDarkMode && { backgroundColor: '#2E4C3E' }]}>
+                  <Text style={[styles.payBadgeGreenText, isDarkMode && { color: '#9EE0BE' }]}>{isArabic ? 'سداد 💳' : 'Pay'}</Text>
                 </View>
-                <MaterialCommunityIcons name="credit-card-outline" size={14} color="#065F46" />
+                <MaterialCommunityIcons name="credit-card-outline" size={14} color={isDarkMode ? '#8ED6B3' : '#065F46'} />
               </View>
             </View>
-            <Text style={[styles.accountAmount, styles.greenCaText]} numberOfLines={1}>
+            <Text style={[styles.accountAmount, styles.greenCaText, isDarkMode && styles.darkGreenCaText]} numberOfLines={1}>
               {formatAmount(balances.ccCaDebt)} {currency.symbol}
             </Text>
             <Text
-              style={[styles.accountSub, styles.greenCaSubText]}
+              style={[styles.accountSub, styles.greenCaSubText, isDarkMode && styles.darkGreenCaSubText]}
               numberOfLines={1}
               adjustsFontSizeToFit={true}
               minimumFontScale={0.75}
@@ -230,15 +230,15 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
             </Text>
           </TouchableOpacity>
 
-          {/* Block 4: البنك العربي (CC AR) - أزرق فاتح وفونت أزرق غامق */}
+          {/* Block 4: البنك العربي (CC AR) */}
           <TouchableOpacity
-            style={[styles.accountCard, styles.blueArCard, { flex: 1 }, isArabic && { alignItems: 'flex-end' }]}
+            style={[styles.accountCard, styles.blueArCard, isDarkMode && styles.darkBlueArCard, { flex: 1 }, isArabic && { alignItems: 'flex-end' }]}
             onPress={() => onOpenPayCc && onOpenPayCc('cc_ar')}
             activeOpacity={0.75}
           >
             <View style={[styles.accountTop, isArabic && { flexDirection: 'row-reverse' }]}>
               <Text
-                style={[styles.accountName, styles.blueArText, isArabic && { textAlign: 'right' }]}
+                style={[styles.accountName, styles.blueArText, isDarkMode && styles.darkBlueArText, isArabic && { textAlign: 'right' }]}
                 numberOfLines={1}
                 adjustsFontSizeToFit={true}
                 minimumFontScale={0.75}
@@ -246,17 +246,17 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
                 {isArabic ? 'العربي (CC AR)' : 'Arab Bank (CC)'}
               </Text>
               <View style={[styles.payBadgeRow, isArabic && { flexDirection: 'row-reverse' }]}>
-                <View style={styles.payBadgeBlue}>
-                  <Text style={styles.payBadgeBlueText}>{isArabic ? 'سداد 💳' : 'Pay'}</Text>
+                <View style={[styles.payBadgeBlue, isDarkMode && { backgroundColor: '#314460' }]}>
+                  <Text style={[styles.payBadgeBlueText, isDarkMode && { color: '#A5C8F5' }]}>{isArabic ? 'سداد 💳' : 'Pay'}</Text>
                 </View>
-                <MaterialCommunityIcons name="credit-card-clock" size={14} color="#1E40AF" />
+                <MaterialCommunityIcons name="credit-card-clock" size={14} color={isDarkMode ? '#93BCEF' : '#1E40AF'} />
               </View>
             </View>
-            <Text style={[styles.accountAmount, styles.blueArText]} numberOfLines={1}>
+            <Text style={[styles.accountAmount, styles.blueArText, isDarkMode && styles.darkBlueArText]} numberOfLines={1}>
               {formatAmount(balances.ccArDebt)} {currency.symbol}
             </Text>
             <Text
-              style={[styles.accountSub, styles.blueArSubText]}
+              style={[styles.accountSub, styles.blueArSubText, isDarkMode && styles.darkBlueArSubText]}
               numberOfLines={1}
               adjustsFontSizeToFit={true}
               minimumFontScale={0.75}
@@ -274,17 +274,17 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
         {(balances.customDebitCardsSummary || []).length > 0 && (
           <View style={[styles.blocksPairRow, isArabic && { flexDirection: 'row-reverse' }]}>
             {(balances.customDebitCardsSummary || []).map((dCard) => (
-              <View key={dCard.id} style={[styles.accountCard, styles.blueArCard, { flex: 1 }, isArabic && { alignItems: 'flex-end' }]}>
+              <View key={dCard.id} style={[styles.accountCard, styles.blueArCard, isDarkMode && styles.darkBlueArCard, { flex: 1 }, isArabic && { alignItems: 'flex-end' }]}>
                 <View style={[styles.accountTop, isArabic && { flexDirection: 'row-reverse' }]}>
-                  <Text style={[styles.accountName, styles.blueArText, isArabic && { textAlign: 'right' }]} numberOfLines={1}>
+                  <Text style={[styles.accountName, styles.blueArText, isDarkMode && styles.darkBlueArText, isArabic && { textAlign: 'right' }]} numberOfLines={1}>
                     {dCard.bankName} (DC)
                   </Text>
-                  <MaterialCommunityIcons name="credit-card-outline" size={15} color="#1E40AF" />
+                  <MaterialCommunityIcons name="credit-card-outline" size={15} color={isDarkMode ? '#93BCEF' : '#1E40AF'} />
                 </View>
-                <Text style={[styles.accountAmount, styles.blueArText]} numberOfLines={1}>
+                <Text style={[styles.accountAmount, styles.blueArText, isDarkMode && styles.darkBlueArText]} numberOfLines={1}>
                   {formatAmount(dCard.avail)} {currency.symbol}
                 </Text>
-                <Text style={[styles.accountSub, styles.blueArSubText]} numberOfLines={1}>
+                <Text style={[styles.accountSub, styles.blueArSubText, isDarkMode && styles.darkBlueArSubText]} numberOfLines={1}>
                   {isArabic ? `بدأنا بـ ${formatAmount(dCard.startBal)}` : `Start ${formatAmount(dCard.startBal)}`}
                 </Text>
               </View>
@@ -298,25 +298,25 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
             {(balances.customCreditCardsSummary || []).map((cCard) => (
               <TouchableOpacity
                 key={cCard.id}
-                style={[styles.accountCard, styles.greenCaCard, { flex: 1 }, isArabic && { alignItems: 'flex-end' }]}
+                style={[styles.accountCard, styles.greenCaCard, isDarkMode && styles.darkGreenCaCard, { flex: 1 }, isArabic && { alignItems: 'flex-end' }]}
                 onPress={() => onOpenPayCc && onOpenPayCc(cCard.id)}
                 activeOpacity={0.75}
               >
                 <View style={[styles.accountTop, isArabic && { flexDirection: 'row-reverse' }]}>
-                  <Text style={[styles.accountName, styles.greenCaText, isArabic && { textAlign: 'right' }]} numberOfLines={1}>
+                  <Text style={[styles.accountName, styles.greenCaText, isDarkMode && styles.darkGreenCaText, isArabic && { textAlign: 'right' }]} numberOfLines={1}>
                     {cCard.bankName} (CC)
                   </Text>
                   <View style={[styles.payBadgeRow, isArabic && { flexDirection: 'row-reverse' }]}>
-                    <View style={styles.payBadgeGreen}>
-                      <Text style={styles.payBadgeGreenText}>{isArabic ? 'سداد 💳' : 'Pay'}</Text>
+                    <View style={[styles.payBadgeGreen, isDarkMode && { backgroundColor: '#2E4C3E' }]}>
+                      <Text style={[styles.payBadgeGreenText, isDarkMode && { color: '#9EE0BE' }]}>{isArabic ? 'سداد 💳' : 'Pay'}</Text>
                     </View>
-                    <MaterialCommunityIcons name="credit-card-clock-outline" size={14} color="#065F46" />
+                    <MaterialCommunityIcons name="credit-card-clock-outline" size={14} color={isDarkMode ? '#8ED6B3' : '#065F46'} />
                   </View>
                 </View>
-                <Text style={[styles.accountAmount, styles.greenCaText]} numberOfLines={1}>
+                <Text style={[styles.accountAmount, styles.greenCaText, isDarkMode && styles.darkGreenCaText]} numberOfLines={1}>
                   {formatAmount(cCard.totalDebt)} {currency.symbol}
                 </Text>
-                <Text style={[styles.accountSub, styles.greenCaSubText]} numberOfLines={1}>
+                <Text style={[styles.accountSub, styles.greenCaSubText, isDarkMode && styles.darkGreenCaSubText]} numberOfLines={1}>
                   {cCard.dueThisMonth > 0
                     ? `25/11: ${formatAmount(cCard.dueThisMonth)} • 25/12: ${formatAmount(cCard.dueNextMonth)}`
                     : isArabic
@@ -330,7 +330,7 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
       </View>
 
       {/* 4. Burn Rate & Insights Row */}
-      <View style={[styles.insightsRow, isArabic && { flexDirection: 'row-reverse' }]}>
+      <View style={[styles.insightsRow, isDarkMode && { backgroundColor: themeColors.surfaceSecondary, borderColor: themeColors.border }, isArabic && { flexDirection: 'row-reverse' }]}>
         <View style={styles.insightItem}>
           <Text style={[styles.insightVal, { color: '#DC2626' }]}>
             {formatAmount(balances.totalOutflow)}
@@ -626,6 +626,37 @@ const styles = StyleSheet.create({
   },
   blueArSubText: {
     color: '#2563EB',
+  },
+  // Soft Dark-Gray Box Themes (for comfortable dark mode)
+  darkBeigeCard: {
+    backgroundColor: '#36332B',
+    borderColor: '#524B3B',
+  },
+  darkBeigeText: {
+    color: '#EAD7A7',
+  },
+  darkBeigeSubText: {
+    color: '#C7B485',
+  },
+  darkGreenCaCard: {
+    backgroundColor: '#283630',
+    borderColor: '#3B564A',
+  },
+  darkGreenCaText: {
+    color: '#A7E3C5',
+  },
+  darkGreenCaSubText: {
+    color: '#82C2A3',
+  },
+  darkBlueArCard: {
+    backgroundColor: '#293240',
+    borderColor: '#3E4F69',
+  },
+  darkBlueArText: {
+    color: '#B5D2F7',
+  },
+  darkBlueArSubText: {
+    color: '#8EB2E0',
   },
   accountTop: {
     flexDirection: 'row',

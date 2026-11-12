@@ -76,20 +76,32 @@ export const subscribeVoiceEvents = ({ onReady, onPartial, onResult, onError, on
 /**
  * Speaks text using the device's native TTS engine (e.g. Samsung/Google Arabic voice).
  */
-export const speakText = (text, { language = 'ar', rate = 0.95, pitch = 1.0 } = {}) => {
+export const speakText = (text, { language = 'ar', rate = 0.95, pitch = 1.0, onDone } = {}) => {
   if (!Speech || !Speech.speak) {
     console.log('[VoiceAssistant] Speech engine not available:', text);
+    if (typeof onDone === 'function') onDone();
     return;
   }
   try {
     Speech.stop();
+    let doneCalled = false;
+    const triggerDone = () => {
+      if (!doneCalled) {
+        doneCalled = true;
+        if (typeof onDone === 'function') onDone();
+      }
+    };
     Speech.speak(text, {
       language: language === 'ar' ? 'ar-EG' : 'en-US',
       rate,
       pitch,
+      onDone: triggerDone,
+      onStopped: triggerDone,
+      onError: triggerDone,
     });
   } catch (err) {
     console.warn('[VoiceAssistant] speak error:', err);
+    if (typeof onDone === 'function') onDone();
   }
 };
 
@@ -265,13 +277,14 @@ export const parseSpokenExpense = (sentence = '', categories = [], paymentMethod
 
   // 2. Match payment method (Egyptian colloquial + English + custom banks)
   let paymentMethod = null;
+  let needsBankName = false;
   if (/كاش|نقدي|نقدا|فلوس|في ايدي|cash|csh/i.test(s)) {
     paymentMethod = 'csh';
   } else if (/اجريكول|أجريكول|كريدي|كريدى|agricole|cc ca|cc_ca/i.test(s)) {
     paymentMethod = 'cc_ca';
-  } else if (/عربي|البنك العربي|كارت العربي|كريديت|كريدت|كريديت كارد|credit|cc ar|cc_ar/i.test(s)) {
+  } else if (/عربي|البنك العربي|كارت العربي|arab bank|arab|cc ar|cc_ar/i.test(s)) {
     paymentMethod = 'cc_ar';
-  } else if (/فيزا|كارت|بنك|حساب|ديبت|ديبيت|خصم مباشر|انستاباي|إنستاباي|dc|debit/i.test(s)) {
+  } else if (/فيزا|ديبت|ديبيت|خصم مباشر|انستاباي|إنستاباي|dc|debit/i.test(s)) {
     paymentMethod = 'dc';
   }
 
@@ -285,7 +298,13 @@ export const parseSpokenExpense = (sentence = '', categories = [], paymentMethod
         const ar = (p.nameAr || '').toLowerCase();
         const sar = (p.shortNameAr || '').toLowerCase();
         const en = (p.name || '').toLowerCase();
-        return (ar && s.includes(ar)) || (sar && s.includes(sar)) || (en && s.includes(en));
+        const bank = (p.bankName || '').toLowerCase();
+        return (
+          (ar && s.includes(ar)) ||
+          (sar && s.includes(sar)) ||
+          (en && s.includes(en)) ||
+          (bank && s.includes(bank))
+        );
       }) || null;
       if (matchedPaymentMethod) {
         paymentMethod = matchedPaymentMethod.id;
@@ -295,10 +314,21 @@ export const parseSpokenExpense = (sentence = '', categories = [], paymentMethod
     matchedPaymentMethod = { id: paymentMethod };
   }
 
+  // If user said generic "كارت ائتمان / كريديت كارد / credit card" without specifying a bank name,
+  // flag needsBankName so the assistant asks for the bank name.
+  if (!paymentMethod && /كريديت|كريدت|كريديت كارد|كارت ائتمان|بطاقة ائتمان|ائتمان|credit card|credit/i.test(s)) {
+    needsBankName = true;
+  } else if (!paymentMethod && /كارت|بنك|حساب/i.test(s)) {
+    paymentMethod = 'dc';
+    if (Array.isArray(paymentMethods)) {
+      matchedPaymentMethod = paymentMethods.find((p) => p.id === 'dc') || null;
+    }
+  }
+
   // 3. Build a clean note by stripping filler words and numbers
   const cleanedNote = raw
     .replace(/[٠-٩\d]+(?:\.\d+)?/g, '')
-    .replace(/(?:جنيه|جنية|ج\.م|صرفت|دفعت|ادفع|سجل|مصروف|من|في|على|عبر|بـ|كاش|نقدي|نقدا|كريديت كارد|كريديت|كريدت|فيزا|ديبت|بنك|كارت)/gi, ' ')
+    .replace(/(?:جنيه|جنية|ج\.م|صرفت|دفعت|ادفع|سجل|مصروف|من|في|على|عبر|بـ|كاش|نقدي|نقدا|كريديت كارد|كريديت|كريدت|كارت ائتمان|ائتمان|فيزا|ديبت|بنك|كارت)/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 
@@ -308,6 +338,7 @@ export const parseSpokenExpense = (sentence = '', categories = [], paymentMethod
     matchedCategory,
     paymentMethod,
     matchedPaymentMethod,
+    needsBankName,
     note: cleanedNote || raw,
     originalText: raw,
   };

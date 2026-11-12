@@ -15,6 +15,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, SHADOWS } from '../constants/theme';
 import { useExpense } from '../context/ExpenseContext';
 import { TransactionItem } from '../components/TransactionItem';
+import { AddTransactionModal } from '../components/AddTransactionModal';
 import { getCategoryById, getPaymentMethodById } from '../constants/categories';
 import { saveExcelToChosenFolder, shareExcelFile } from '../utils/excelHelper';
 
@@ -42,6 +43,7 @@ export const HistoryScreen = () => {
   // Modal to inspect a selected archived month's full transactions
   const [selectedArchive, setSelectedArchive] = useState(null);
   const [archiveSearch, setArchiveSearch] = useState('');
+  const [editingTransaction, setEditingTransaction] = useState(null);
 
   // Filtered transactions for CURRENT month (always sorted newest-first)
   const filteredList = useMemo(() => {
@@ -248,7 +250,13 @@ export const HistoryScreen = () => {
             >
               <View style={{ flex: 1, width: '100%' }}>
                 {filteredList.length > 0 ? (
-                  filteredList.map((item) => <TransactionItem key={item.id} item={item} />)
+                  filteredList.map((item) => (
+                    <TransactionItem
+                      key={item.id}
+                      item={item}
+                      onEdit={(selectedTx) => setEditingTransaction(selectedTx)}
+                    />
+                  ))
                 ) : (
                   <View style={styles.emptyWrap}>
                     <MaterialCommunityIcons name="file-search-outline" size={48} color={COLORS.textMuted} />
@@ -484,6 +492,13 @@ export const HistoryScreen = () => {
           </ScrollView>
         </SafeAreaView>
       </Modal>
+      {/* Edit Transaction Modal */}
+      <AddTransactionModal
+        visible={!!editingTransaction}
+        initialType={editingTransaction?.type || 'expense'}
+        editingTransaction={editingTransaction}
+        onClose={() => setEditingTransaction(null)}
+      />
     </SafeAreaView>
   );
 };

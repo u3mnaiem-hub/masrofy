@@ -5,7 +5,7 @@ import { COLORS } from '../constants/theme';
 import { getCategoryById, getPaymentMethodById } from '../constants/categories';
 import { useExpense, getGracePeriodStats } from '../context/ExpenseContext';
 
-export const TransactionItem = ({ item }) => {
+export const TransactionItem = ({ item, onEdit }) => {
   const {
     deleteTransaction,
     currency,
@@ -133,6 +133,22 @@ export const TransactionItem = ({ item }) => {
     );
   };
 
+  const formattedTime = (() => {
+    if (item.time) return item.time;
+    const ts = item.createdAt;
+    if (!ts) return '';
+    const d = new Date(ts);
+    if (Number.isNaN(d.getTime())) return '';
+    let hours = d.getHours();
+    const mins = String(d.getMinutes()).padStart(2, '0');
+    const isPm = hours >= 12;
+    hours = hours % 12 || 12;
+    const period = isArabic ? (isPm ? 'م' : 'ص') : (isPm ? 'PM' : 'AM');
+    return `${hours}:${mins} ${period}`;
+  })();
+
+  const dateTimeText = formattedTime ? `${item.date} • ${formattedTime}` : item.date;
+
   return (
     <View style={[styles.card, isArabic && { flexDirection: 'row-reverse' }, isDarkMode && { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
       {/* Category Icon */}
@@ -153,7 +169,7 @@ export const TransactionItem = ({ item }) => {
         ) : null}
 
         <View style={[styles.metaRow, isArabic && { flexDirection: 'row-reverse' }]}>
-          <Text style={[styles.dateText, isDarkMode && { color: themeColors.textMuted }]}>{item.date}</Text>
+          <Text style={[styles.dateText, isDarkMode && { color: themeColors.textMuted }]}>{dateTimeText}</Text>
           <View style={[styles.dot, isDarkMode && { backgroundColor: themeColors.border }]} />
           <Text style={[styles.paymentMethodText, isDarkMode && { color: themeColors.textSecondary }]} numberOfLines={1} adjustsFontSizeToFit={true} minimumFontScale={0.75}>{paymentLabel}</Text>
         </View>
@@ -209,15 +225,27 @@ export const TransactionItem = ({ item }) => {
           <Text style={styles.currencySymbol}>{currency.symbol}</Text>
         </View>
 
-        {/* Delete button: separated with a clean touch circle */}
-        <TouchableOpacity
-          onPress={handleDelete}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          style={styles.deleteButton}
-          activeOpacity={0.6}
-        >
-          <MaterialCommunityIcons name="trash-can-outline" size={15} color="#DC2626" />
-        </TouchableOpacity>
+        {/* Action buttons: Edit + Delete */}
+        <View style={[styles.actionButtonsRow, isArabic && { flexDirection: 'row-reverse' }]}>
+          {onEdit && (
+            <TouchableOpacity
+              onPress={() => onEdit(item)}
+              hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+              style={[styles.editButton, isDarkMode && { backgroundColor: themeColors.infoLight }]}
+              activeOpacity={0.6}
+            >
+              <MaterialCommunityIcons name="pencil-outline" size={14} color={isDarkMode ? themeColors.info : '#2563EB'} />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            onPress={handleDelete}
+            hitSlop={{ top: 8, bottom: 8, left: 6, right: 8 }}
+            style={[styles.deleteButton, isDarkMode && { backgroundColor: themeColors.expenseLight }]}
+            activeOpacity={0.6}
+          >
+            <MaterialCommunityIcons name="trash-can-outline" size={15} color={isDarkMode ? themeColors.expense : '#DC2626'} />
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -304,6 +332,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.textMuted,
   },
+  actionButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  editButton: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#DBEAFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   deleteButton: {
     width: 26,
     height: 26,
@@ -311,7 +353,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEE2E2',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 4,
   },
   settleActionRow: {
     flexDirection: 'row',

@@ -34,9 +34,11 @@ export const AddTransactionModal = ({
   onClose,
   initialType = 'expense',
   initialTargetCard = 'cc_ar',
+  editingTransaction = null,
 }) => {
   const {
     addTransaction,
+    updateTransaction,
     currency,
     isArabic,
     allPaymentMethods,
@@ -180,9 +182,26 @@ export const AddTransactionModal = ({
 
   useEffect(() => {
     if (visible) {
+      if (editingTransaction) {
+        const editM = editingTransaction.type === 'cc_pyd'
+          ? 'cc_pyd'
+          : (editingTransaction.type === 'switch' ? 'switch' : (editingTransaction.type === 'income' ? 'income' : 'expense'));
+        setMode(editM);
+        setAmount(editingTransaction.amount != null ? String(editingTransaction.amount) : '');
+        setCategoryId(editingTransaction.categoryId || EXPENSE_CATEGORIES[0].id);
+        setPaymentMethod(editingTransaction.paymentMethod || 'csh');
+        setToAccount(editingTransaction.toAccount || 'dc');
+        setTargetCard(editingTransaction.targetCard || initialTargetCard || 'cc_ar');
+        setNote(editingTransaction.note || '');
+        setDate(editingTransaction.date || new Date().toISOString().split('T')[0]);
+        setOneLineSentence('');
+        return;
+      }
+
       const initM = initialType === 'cc_pyd' ? 'cc_pyd' : (initialType === 'switch' ? 'switch' : (initialType === 'income' ? 'income' : 'expense'));
       setMode(initM);
       setAmount('');
+      setOneLineSentence('');
       setDate(new Date().toISOString().split('T')[0]);
 
       if (initM === 'cc_pyd') {
@@ -207,7 +226,7 @@ export const AddTransactionModal = ({
         setNote('');
       }
     }
-  }, [visible, initialType, initialTargetCard]);
+  }, [visible, initialType, initialTargetCard, editingTransaction]);
 
   const handleModeChange = (newMode) => {
     setMode(newMode);
@@ -264,15 +283,57 @@ export const AddTransactionModal = ({
     }
   };
 
-  const scheduleWizardListen = (delayMs = 1400) => {
+  const scheduleWizardListen = (delayMs = 800) => {
     if (autoListenTimerRef.current) clearTimeout(autoListenTimerRef.current);
     autoListenTimerRef.current = setTimeout(() => {
       beginListening('wizard');
     }, delayMs);
   };
 
-  // Single-sentence One-Shot Voice Dictation (إملاء سطر واحد ينفذ كل شيء دفعة واحدة)
-  const handleExecuteOneLineVoice = (spokenOverride) => {
+  const speakWizardAndListen = (prompt, fallbackDelayMs = 4800) => {
+    if (autoListenTimerRef.current) clearTimeout(autoListenTimerRef.current);
+    let listened = false;
+    const triggerListen = () => {
+      if (!listened) {
+        listened = true;
+        scheduleWizardListen(650);
+      }
+    };
+    autoListenTimerRef.current = setTimeout(triggerListen, fallbackDelayMs);
+    speakText(prompt, {
+      language: isArabic ? 'ar' : 'en',
+      onDone: triggerListen,
+    });
+  };
+
+  const getBankNamesHint = () => {
+    const cards = availableCreditCards || [];
+    if (cards.length === 0) return isArabic ? 'العربي أو أجريكول' : 'Arab Bank or Crédit Agricole';
+    return cards
+      .map((c) => (isArabic ? (c.shortNameAr || c.nameAr || c.name) : (c.shortName || c.name)))
+      .join(isArabic ? ' أو ' : ' or ');
+  };
+
+  const matchCreditCardByBankName = (spokenText, pmList) => {
+    const s = (spokenText || '').toLowerCase();
+    const cards = (pmList || []).filter((p) => p.isCredit || p.id === 'cc_ar' || p.id === 'cc_ca' || String(p.id).startsWith('cc_'));
+    if (/اجريكول|أجريكول|كريدي|كريدى|agricole|cc ca|cc_ca/i.test(s)) {
+      return cards.find((c) => c.id === 'cc_ca') || { id: 'cc_ca' };
+    }
+    if (/عربي|العربي|arab/i.test(s)) {
+      return cards.find((c) => c.id === 'cc_ar') || { id: 'cc_ar' };
+    }
+    return cards.find((c) => {
+      const ar = (c.nameAr || '').toLowerCase();
+      const sar = (c.shortNameAr || '').toLowerCase();
+      const en = (c.name || '').toLowerCase();
+      const bank = (c.bankName || '').toLowerCase();
+      return (ar && s.includes(ar)) || (sar && s.includes(sar)) || (en && s.includes(en)) || (bank && s.includes(bank));
+    }) || null;
+  };
+
+  // Single-sentence One-Shot Voice Dictation (إملاء سطر واحد ينفذ كل شيء دفعة واحدة ويحفظ ويرجع للرئيسية)
+  const handleExecuteOneLineVoice = async (spokenOverride) => {
     const text = (typeof spokenOverride === 'string' ? spokenOverride : oneLineSentence || '').trim();
     if (!text) {
       Alert.alert(
@@ -288,8 +349,9 @@ export const AddTransactionModal = ({
     const pmList = allPaymentMethods || PAYMENT_METHODS;
     const parsed = parseSpokenExpense(text, categoriesList, pmList);
 
-    if (parsed.amount && parsed.amount > 0) {
-      setAmount(String(parsed.amount));
+    const finalAmt = parsed.amount && parsed.amount > 0 ? parsed.amount : (parseFloat(amount) || 0);
+    if (finalAmt > 0) {
+      setAmount(String(finalAmt));
     }
     const nextCatId = parsed.categoryId || parsed.matchedCategory?.id || categoryId;
     if (parsed.categoryId || parsed.matchedCategory?.id) {
@@ -299,8 +361,24 @@ export const AddTransactionModal = ({
     if (parsed.paymentMethod || parsed.matchedPaymentMethod?.id) {
       setPaymentMethod(nextPmId);
     }
+    const nextNote = parsed.note || note;
     if (parsed.note) {
       setNote(parsed.note);
+    }
+
+    // Requirement 6: If credit card was said without bank name, ask for bank name!
+    if (parsed.needsBankName) {
+      setVoiceStep(4);
+      setVoiceStepInput('');
+      setVoiceListenTarget('wizard');
+      voiceTargetRef.current = 'wizard';
+      const bankPrompt = isArabic
+        ? `ما اسم البنك صاحب كارت الائتمان؟ مثل ${getBankNamesHint()}`
+        : `Which bank is the credit card from? e.g. ${getBankNamesHint()}`;
+      setVoiceStepPrompt(bankPrompt);
+      setVoiceStepPlaceholder(isArabic ? 'تحدث أو اكتب اسم البنك (مثال: العربي، أجريكول)' : 'Say or type bank name');
+      speakWizardAndListen(bankPrompt, 5000);
+      return;
     }
 
     const catObj = categoriesList.find((c) => c.id === nextCatId);
@@ -310,10 +388,28 @@ export const AddTransactionModal = ({
       ? (pmObj?.shortNameAr || pmObj?.nameAr || 'كاش')
       : (pmObj?.shortName || pmObj?.name || 'Cash');
 
-    const speakMsg = isArabic
-      ? `تم إدخال ${parsed.amount > 0 ? parsed.amount + ' جنيه' : ''} ${catName} ${pmName}`
-      : `Filled ${parsed.amount || ''} ${catName} ${pmName}`;
-    speakText(speakMsg, { language: isArabic ? 'ar' : 'en' });
+    // Requirement 4: Save the record and return to the Home screen's Add Expense button
+    if (finalAmt > 0) {
+      const speakMsg = isArabic
+        ? `تم حفظ ${finalAmt} ${currency.symbol} لبند ${catName} عبر ${pmName}`
+        : `Saved ${finalAmt} ${currency.symbol} for ${catName} via ${pmName}`;
+      speakText(speakMsg, { language: isArabic ? 'ar' : 'en' });
+
+      await addTransaction({
+        type: mode === 'income' ? 'income' : 'expense',
+        amount: finalAmt,
+        categoryId: nextCatId,
+        note: nextNote || (isArabic ? `تسجيل صوتي: ${catName}` : `Voice entry: ${catName}`),
+        date: date || new Date().toISOString().split('T')[0],
+        paymentMethod: nextPmId,
+      });
+      onClose();
+    } else {
+      const speakMsg = isArabic
+        ? 'لم يتم التعرف على المبلغ، يرجى ذكر المبلغ وحفظ المصروف'
+        : 'Amount not detected, please mention the amount';
+      speakText(speakMsg, { language: isArabic ? 'ar' : 'en' });
+    }
   };
 
   // Interactive Voice-Dictated Entry Step-by-Step (Auto-advances & auto-listens!)
@@ -325,8 +421,7 @@ export const AddTransactionModal = ({
     const prompt = isArabic ? 'كم المبلغ الذي تريد تسجيله؟' : 'How much is the amount?';
     setVoiceStepPrompt(prompt);
     setVoiceStepPlaceholder(isArabic ? 'تحدث أو اكتب المبلغ (مثال: 100 أو مية)' : 'Say or type amount (e.g. 100)');
-    speakText(prompt, { language: isArabic ? 'ar' : 'en' });
-    scheduleWizardListen(1300);
+    speakWizardAndListen(prompt, 4000);
   };
 
   const stopVoiceWizard = () => {
@@ -363,12 +458,10 @@ export const AddTransactionModal = ({
           : `Amount is ${parsedAmt}. What is the category?`;
         setVoiceStepPrompt(prompt);
         setVoiceStepPlaceholder(isArabic ? 'تحدث أو اكتب البند (مثال: بنزين، طعام)' : 'Say or type category');
-        speakText(prompt, { language: isArabic ? 'ar' : 'en' });
-        scheduleWizardListen(2200);
+        speakWizardAndListen(prompt, 5500);
       } else {
         const errorMsg = isArabic ? 'يرجى نطق أو كتابة المبلغ أولاً' : 'Please say or type the amount first';
-        speakText(errorMsg, { language: isArabic ? 'ar' : 'en' });
-        scheduleWizardListen(1500);
+        speakWizardAndListen(errorMsg, 4000);
       }
     } else if (voiceStep === 2) {
       // Step 2: Category -> Select Category & Auto-Move to Step 3 (Payment Method)
@@ -386,15 +479,26 @@ export const AddTransactionModal = ({
       const catObj = categoriesList.find((c) => c.id === selectedCat);
       const cName = isArabic ? (catObj?.nameAr || catObj?.name || 'مصروف') : (catObj?.name || 'expense');
       const prompt = isArabic
-        ? `تم اختيار ${cName}. ما هي طريقة الدفع؟ كاش أم كريديت كارد أم بنك؟`
+        ? `تم اختيار ${cName}. ما هي طريقة الدفع؟ كاش أم كارت ائتمان أم بنك؟`
         : `Category is ${cName}. Payment method?`;
       setVoiceStepPrompt(prompt);
-      setVoiceStepPlaceholder(isArabic ? 'تحدث أو اكتب طريقة الدفع (كاش، كريديت، بنك)' : 'Say or type payment method');
-      speakText(prompt, { language: isArabic ? 'ar' : 'en' });
-      scheduleWizardListen(2200);
+      setVoiceStepPlaceholder(isArabic ? 'تحدث أو اكتب طريقة الدفع (كاش، كارت ائتمان، بنك)' : 'Say or type payment method');
+      speakWizardAndListen(prompt, 5500);
     } else if (voiceStep === 3) {
-      // Step 3: Payment Method -> Auto-save & finish!
+      // Step 3: Payment Method -> If generic credit card, ask for bank name (Step 4); otherwise save & finish!
       const parsed = parseSpokenExpense(inputVal, categoriesList, pmList);
+      if (parsed.needsBankName) {
+        setVoiceStep(4);
+        setVoiceStepInput('');
+        const bankPrompt = isArabic
+          ? `ما اسم البنك صاحب كارت الائتمان؟ مثل ${getBankNamesHint()}`
+          : `Which bank is the credit card from? e.g. ${getBankNamesHint()}`;
+        setVoiceStepPrompt(bankPrompt);
+        setVoiceStepPlaceholder(isArabic ? 'تحدث أو اكتب اسم البنك (مثال: العربي، أجريكول)' : 'Say or type bank name');
+        speakWizardAndListen(bankPrompt, 5000);
+        return;
+      }
+
       let finalPm = paymentMethod;
       if (parsed.paymentMethod || parsed.matchedPaymentMethod?.id) {
         finalPm = parsed.paymentMethod || parsed.matchedPaymentMethod.id;
@@ -429,6 +533,53 @@ export const AddTransactionModal = ({
         const finalMsg = isArabic
           ? `تم تجهيز بند ${cName} وطريقة الدفع ${pmName}.`
           : `Ready! Selected ${cName} and ${pmName}.`;
+        speakText(finalMsg, { language: isArabic ? 'ar' : 'en' });
+      }
+    } else if (voiceStep === 4) {
+      // Step 4: Credit card bank name
+      const matchedCard = matchCreditCardByBankName(inputVal, pmList);
+      if (!matchedCard) {
+        const retryPrompt = isArabic
+          ? `لم أتعرف على اسم البنك. من فضلك قل اسم البنك مثل ${getBankNamesHint()}`
+          : `Bank not recognized. Please say the bank name like ${getBankNamesHint()}`;
+        setVoiceStepPrompt(retryPrompt);
+        setVoiceStepInput('');
+        speakWizardAndListen(retryPrompt, 5000);
+        return;
+      }
+
+      const finalPm = matchedCard.id;
+      setPaymentMethod(finalPm);
+      if (autoListenTimerRef.current) clearTimeout(autoListenTimerRef.current);
+      setVoiceStep(0);
+      setVoiceStepInput('');
+      setVoiceListenTarget(null);
+
+      const pmObj = pmList.find((p) => p.id === finalPm) || matchedCard;
+      const pmName = isArabic ? (pmObj?.shortNameAr || pmObj?.nameAr || finalPm) : (pmObj?.shortName || pmObj?.name || finalPm);
+      const catObj = categoriesList.find((c) => c.id === categoryId);
+      const cName = isArabic ? (catObj?.nameAr || catObj?.name || 'مصروف') : (catObj?.name || 'expense');
+
+      const numAmt = parseFloat(amount);
+      if (numAmt > 0) {
+        const finalMsg = isArabic
+          ? `تم بنجاح! تم حفظ ${numAmt} ${currency.symbol} لبند ${cName} عبر كارت ${pmName}.`
+          : `Saved! ${numAmt} ${currency.symbol} for ${cName} via ${pmName}.`;
+        speakText(finalMsg, { language: isArabic ? 'ar' : 'en' });
+
+        await addTransaction({
+          type: 'expense',
+          amount: numAmt,
+          categoryId: categoryId,
+          note: note || (isArabic ? `تسجيل صوتي: ${cName}` : `Voice entry: ${cName}`),
+          date: date || new Date().toISOString().split('T')[0],
+          paymentMethod: finalPm,
+        });
+        onClose();
+      } else {
+        const finalMsg = isArabic
+          ? `تم اختيار كارت ${pmName}.`
+          : `Selected ${pmName}.`;
         speakText(finalMsg, { language: isArabic ? 'ar' : 'en' });
       }
     }
@@ -540,6 +691,21 @@ export const AddTransactionModal = ({
       } else if (txCategoryId === 'cc_pyd') {
         txType = 'cc_pyd';
       }
+    }
+
+    if (editingTransaction) {
+      await updateTransaction(editingTransaction.id, {
+        type: txType,
+        amount: numericAmount,
+        categoryId: txCategoryId,
+        note: txNote,
+        date: date || editingTransaction.date || new Date().toISOString().split('T')[0],
+        paymentMethod,
+        toAccount: mode === 'switch' ? toAccount : null,
+        targetCard: mode === 'cc_pyd' ? targetCard : null,
+      });
+      onClose();
+      return;
     }
 
     const saved = await addTransaction({
@@ -1445,7 +1611,9 @@ export const AddTransactionModal = ({
                 style={{ marginHorizontal: 6 }}
               />
               <Text style={styles.saveButtonText}>
-                {mode === 'cc_pyd'
+                {editingTransaction
+                  ? isArabic ? 'حفظ التعديلات' : 'Save Changes'
+                  : mode === 'cc_pyd'
                   ? isArabic
                     ? `تأكيد سداد البطاقة (${amount || 0} ${currency.symbol})`
                     : `Confirm CC Payment (${amount || 0} ${currency.symbol})`
