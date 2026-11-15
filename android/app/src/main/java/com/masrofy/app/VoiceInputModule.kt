@@ -3,8 +3,9 @@ package com.masrofy.app
 import android.app.KeyguardManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.hardware.biometrics.BiometricManager
 import android.hardware.biometrics.BiometricPrompt
-import android.hardware.fingerprint.FingerprintManager
 import android.os.Build
 import android.os.Bundle
 import android.os.CancellationSignal
@@ -170,18 +171,24 @@ class VoiceInputModule(private val reactContext: ReactApplicationContext) :
         UiThreadUtil.runOnUiThread {
             try {
                 var available = false
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    @Suppress("DEPRECATION")
-                    val fpManager = reactContext.getSystemService(Context.FINGERPRINT_SERVICE) as? FingerprintManager
-                    @Suppress("DEPRECATION")
-                    if (fpManager != null && fpManager.isHardwareDetected && fpManager.hasEnrolledFingerprints()) {
-                        available = true
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    val bm = reactContext.getSystemService(Context.BIOMETRIC_SERVICE) as? BiometricManager
+                    if (bm != null) {
+                        val canAuth = bm.canAuthenticate(
+                            BiometricManager.Authenticators.BIOMETRIC_WEAK or
+                                BiometricManager.Authenticators.BIOMETRIC_STRONG
+                        )
+                        available = canAuth == BiometricManager.BIOMETRIC_SUCCESS
                     }
-                    if (!available) {
-                        val keyguard = reactContext.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
-                        if (keyguard != null && keyguard.isDeviceSecure) {
-                            available = true
-                        }
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    val hasFpFeature = reactContext.packageManager.hasSystemFeature(PackageManager.FEATURE_FINGERPRINT)
+                    val keyguard = reactContext.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+                    available = hasFpFeature && (keyguard?.isDeviceSecure == true)
+                }
+                if (!available && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    val keyguard = reactContext.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+                    if (keyguard != null && keyguard.isDeviceSecure) {
+                        available = true
                     }
                 }
                 promise.resolve(available)
@@ -202,14 +209,14 @@ class VoiceInputModule(private val reactContext: ReactApplicationContext) :
             }
 
             try {
-                val activity = currentActivity
+                val activity = reactContext.currentActivity
                 if (activity == null) {
                     resolveOnce(false)
                     return@runOnUiThread
                 }
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    val executor = activity.mainExecutor
+                    val executor = androidx.core.content.ContextCompat.getMainExecutor(activity)
                     val cancellationSignal = CancellationSignal()
                     val promptTitle = if (title.isNotBlank()) title else "تأكيد الهوية بالبصمة"
                     val promptSub = if (subtitle.isNotBlank()) subtitle else "ضع إصبعك على مستشعر البصمة لفتح تطبيق مصروفي"
