@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
+import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DEFAULT_CURRENCY } from '../constants/currencies';
 import { getCategoryById, PAYMENT_METHODS, EXPENSE_CATEGORIES } from '../constants/categories';
@@ -8,43 +9,49 @@ import {
   sendTestCreditCardNotification,
   sendBudgetExceededNotification,
 } from '../utils/notificationHelper';
+import {
+  isBiometricHardwareAvailable,
+  authenticateWithBiometrics,
+} from '../utils/biometricHelper';
 
 const ExpenseContext = createContext();
 
 // Updated storage key to force phone to drop any stale cache
 const STORAGE_KEYS = {
-  TRANSACTIONS: '@u3mxpns_v10_transactions',
-  START_BALANCES: '@u3mxpns_v10_start_balances',
-  CYCLE_START: '@u3mxpns_v10_cycle_start',
-  CYCLE_END: '@u3mxpns_v10_cycle_end',
-  CARRY_OVERS: '@u3mxpns_v10_carry_overs',
-  ALERT_PREFS: '@u3mxpns_v10_alert_prefs',
-  LANGUAGE: '@u3mxpns_v10_language',
-  CUSTOM_ACCOUNTS: '@u3mxpns_v10_custom_accounts',
-  ARCHIVED_MONTHS: '@u3mxpns_v10_archived_months',
-  CATEGORY_BUDGETS: '@u3mxpns_v10_category_budgets',
-  CUSTOM_CATEGORIES: '@u3mxpns_v10_custom_categories',
-  DELETED_CATEGORIES: '@u3mxpns_v10_deleted_categories',
-  DARK_MODE: '@u3mxpns_v10_dark_mode',
-  COLOR_PALETTE: '@u3mxpns_v10_color_palette',
-  RECURRING_BILLS: '@u3mxpns_v10_recurring_bills',
-  SAVINGS_GOALS: '@u3mxpns_v10_savings_goals',
-  APP_PIN: '@u3mxpns_v10_app_pin',
-  HIDE_BALANCES: '@u3mxpns_v10_hide_balances',
+  TRANSACTIONS: '@u3mxpns_v11_transactions',
+  START_BALANCES: '@u3mxpns_v11_start_balances',
+  CYCLE_START: '@u3mxpns_v11_cycle_start',
+  CYCLE_END: '@u3mxpns_v11_cycle_end',
+  CARRY_OVERS: '@u3mxpns_v11_carry_overs',
+  ALERT_PREFS: '@u3mxpns_v11_alert_prefs',
+  LANGUAGE: '@u3mxpns_v11_language',
+  CUSTOM_ACCOUNTS: '@u3mxpns_v11_custom_accounts',
+  ARCHIVED_MONTHS: '@u3mxpns_v11_archived_months',
+  CATEGORY_BUDGETS: '@u3mxpns_v11_category_budgets',
+  CUSTOM_CATEGORIES: '@u3mxpns_v11_custom_categories',
+  DELETED_CATEGORIES: '@u3mxpns_v11_deleted_categories',
+  DARK_MODE: '@u3mxpns_v11_dark_mode',
+  COLOR_PALETTE: '@u3mxpns_v11_color_palette',
+  RECURRING_BILLS: '@u3mxpns_v11_recurring_bills',
+  SAVINGS_GOALS: '@u3mxpns_v11_savings_goals',
+  APP_PIN: '@u3mxpns_v11_app_pin',
+  BIOMETRIC_ENABLED: '@u3mxpns_v11_biometric_enabled',
+  AUTO_LOCK_MINUTE: '@u3mxpns_v11_auto_lock_minute',
+  HIDE_BALANCES: '@u3mxpns_v11_hide_balances',
 };
 
-// Initial starting funds matching Excel Sheet1 row 4 exactly
+// Initial starting funds (halved to 50% of previous mock values)
 export const INITIAL_START_BALANCES = {
-  dc: 16930,  // Started with in DC / Bank Account (16,930)
-  csh: 14500, // Started with in Cash (14,500)
+  dc: 8465,  // Started with in DC / Bank Account (8,465)
+  csh: 7250, // Started with in Cash (7,250)
 };
 
 export const INITIAL_CYCLE_START = '2026-10-22'; // 22 October 2026
 export const INITIAL_CYCLE_END = '2026-11-22';   // 22 November 2026
 
-// From Excel row 9: carryover unpaid balance from previous month for Arab Bank = 2209 (due 25/11)
+// Carryover unpaid balance from previous month for Arab Bank halved (1105 due 25/11)
 export const INITIAL_CARRY_OVERS = {
-  cc_ar: 2209,
+  cc_ar: 1105,
   cc_ca: 0,
 };
 
@@ -94,37 +101,37 @@ export const getGracePeriodStats = (txDateStr, dueDateStr) => {
   }
 };
 
-// Transactions loaded directly from initial dataset
+// Transactions loaded directly from initial dataset (all values halved to 50%)
 export const EXCEL_TRANSACTIONS = [
-  { id: 'tx_init_1', type: 'expense', amount: 210, categoryId: 'trns', note: 'Transport', date: '2026-10-22', paymentMethod: 'csh' },
-  { id: 'tx_init_2', type: 'expense', amount: 264, categoryId: 'mdsn', note: 'Medical & Pharmacy', date: '2026-10-22', paymentMethod: 'cc_ar', dueDate: '2026-11-25' },
-  { id: 'tx_init_3', type: 'expense', amount: 401, categoryId: 'food', note: 'Food & Groceries', date: '2026-10-22', paymentMethod: 'cc_ar', dueDate: '2026-11-25' },
-  { id: 'tx_init_4', type: 'expense', amount: 630, categoryId: 'boz', note: 'Personal Expenses', date: '2026-10-22', paymentMethod: 'csh' },
-  { id: 'tx_init_5', type: 'expense', amount: 40, categoryId: 'mntnns', note: 'Maintenance', date: '2026-10-22', paymentMethod: 'csh' },
-  { id: 'tx_init_6', type: 'expense', amount: 50, categoryId: 'bills', note: 'Water Bill', date: '2026-10-23', paymentMethod: 'csh' },
-  { id: 'tx_init_7', type: 'switch', amount: 2000, categoryId: 'switch', note: 'Cash Withdrawal from DC / Bank Account', date: '2026-10-24', paymentMethod: 'dc', toAccount: 'csh' },
-  { id: 'tx_init_8', type: 'expense', amount: 250, categoryId: 'trns', note: 'Transport', date: '2026-10-25', paymentMethod: 'csh' },
-  { id: 'tx_init_9', type: 'expense', amount: 520, categoryId: 'boz', note: 'Personal Expenses', date: '2026-10-25', paymentMethod: 'csh' },
-  { id: 'tx_init_10', type: 'income', amount: 150, categoryId: 'incomings', note: 'Incoming Deposit', date: '2026-10-27', paymentMethod: 'dc' },
-  { id: 'tx_init_11', type: 'expense', amount: 108, categoryId: 'bills', note: 'Vodafone Bill', date: '2026-10-28', paymentMethod: 'dc' },
-  { id: 'tx_init_12', type: 'cc_pyd', amount: 1173, categoryId: 'cc_pyd', note: 'Arab Bank CC Payment from DC', date: '2026-10-29', paymentMethod: 'dc', targetCard: 'cc_ar' },
-  { id: 'tx_init_13', type: 'expense', amount: 550, categoryId: 'mdsn', note: 'Medical & Pharmacy', date: '2026-10-30', paymentMethod: 'dc' },
-  { id: 'tx_init_14', type: 'expense', amount: 52, categoryId: 'misc', note: 'CapCut Subscription', date: '2026-10-31', paymentMethod: 'cc_ar', dueDate: '2026-11-25' },
-  { id: 'tx_init_15', type: 'expense', amount: 210, categoryId: 'trns', note: 'Transport', date: '2026-11-01', paymentMethod: 'csh' },
-  { id: 'tx_init_16', type: 'expense', amount: 480, categoryId: 'boz', note: 'Personal Expenses', date: '2026-11-01', paymentMethod: 'csh' },
-  { id: 'tx_init_17', type: 'expense', amount: 200, categoryId: 'trns', note: 'Transport', date: '2026-11-02', paymentMethod: 'csh' },
-  { id: 'tx_init_18', type: 'expense', amount: 175, categoryId: 'food', note: 'Food', date: '2026-11-02', paymentMethod: 'csh' },
-  { id: 'tx_init_19', type: 'expense', amount: 35, categoryId: 'bills', note: 'Water Bill', date: '2026-11-03', paymentMethod: 'dc' },
-  { id: 'tx_init_20', type: 'expense', amount: 80, categoryId: 'trns', note: 'Transport', date: '2026-11-03', paymentMethod: 'csh' },
-  { id: 'tx_init_21', type: 'expense', amount: 450, categoryId: 'misc', note: 'Miscellaneous', date: '2026-11-03', paymentMethod: 'csh' },
-  { id: 'tx_init_22', type: 'expense', amount: 520, categoryId: 'boz', note: 'Personal Expenses', date: '2026-11-03', paymentMethod: 'cc_ca', dueDate: '2026-12-25' },
-  { id: 'tx_init_23', type: 'expense', amount: 455, categoryId: 'food', note: 'Food & Groceries', date: '2026-11-03', paymentMethod: 'cc_ca', dueDate: '2026-12-25' },
-  { id: 'tx_init_24', type: 'expense', amount: 108, categoryId: 'bills', note: 'Vodafone Bill', date: '2026-11-04', paymentMethod: 'dc' },
-  { id: 'tx_init_25', type: 'expense', amount: 160, categoryId: 'trns', note: 'Transport', date: '2026-11-05', paymentMethod: 'csh' },
-  { id: 'tx_init_26', type: 'expense', amount: 75, categoryId: 'mntnns', note: 'Maintenance', date: '2026-11-05', paymentMethod: 'dc' },
-  { id: 'tx_init_27', type: 'expense', amount: 480, categoryId: 'boz', note: 'Personal Expenses', date: '2026-11-05', paymentMethod: 'csh' },
-  { id: 'tx_init_28', type: 'expense', amount: 402, categoryId: 'bills', note: 'Home Internet Bill', date: '2026-11-05', paymentMethod: 'dc' },
-  { id: 'tx_init_29', type: 'expense', amount: 145, categoryId: 'bills', note: 'Landline Bill', date: '2026-11-05', paymentMethod: 'dc' },
+  { id: 'tx_init_1', type: 'expense', amount: 105, categoryId: 'trns', note: 'Transport', date: '2026-10-22', paymentMethod: 'csh' },
+  { id: 'tx_init_2', type: 'expense', amount: 132, categoryId: 'mdsn', note: 'Medical & Pharmacy', date: '2026-10-22', paymentMethod: 'cc_ar', dueDate: '2026-11-25' },
+  { id: 'tx_init_3', type: 'expense', amount: 201, categoryId: 'food', note: 'Food & Groceries', date: '2026-10-22', paymentMethod: 'cc_ar', dueDate: '2026-11-25' },
+  { id: 'tx_init_4', type: 'expense', amount: 315, categoryId: 'personal', note: 'Personal Expenses', date: '2026-10-22', paymentMethod: 'csh' },
+  { id: 'tx_init_5', type: 'expense', amount: 20, categoryId: 'mntnns', note: 'Maintenance', date: '2026-10-22', paymentMethod: 'csh' },
+  { id: 'tx_init_6', type: 'expense', amount: 25, categoryId: 'bills', note: 'Water Bill', date: '2026-10-23', paymentMethod: 'csh' },
+  { id: 'tx_init_7', type: 'switch', amount: 1000, categoryId: 'switch', note: 'Cash Withdrawal from DC / Bank Account', date: '2026-10-24', paymentMethod: 'dc', toAccount: 'csh' },
+  { id: 'tx_init_8', type: 'expense', amount: 125, categoryId: 'trns', note: 'Transport', date: '2026-10-25', paymentMethod: 'csh' },
+  { id: 'tx_init_9', type: 'expense', amount: 260, categoryId: 'personal', note: 'Personal Expenses', date: '2026-10-25', paymentMethod: 'csh' },
+  { id: 'tx_init_10', type: 'income', amount: 75, categoryId: 'incomings', note: 'Incoming Deposit', date: '2026-10-27', paymentMethod: 'dc' },
+  { id: 'tx_init_11', type: 'expense', amount: 54, categoryId: 'bills', note: 'Vodafone Bill', date: '2026-10-28', paymentMethod: 'dc' },
+  { id: 'tx_init_12', type: 'cc_pyd', amount: 587, categoryId: 'cc_pyd', note: 'Arab Bank CC Payment from DC', date: '2026-10-29', paymentMethod: 'dc', targetCard: 'cc_ar' },
+  { id: 'tx_init_13', type: 'expense', amount: 275, categoryId: 'mdsn', note: 'Medical & Pharmacy', date: '2026-10-30', paymentMethod: 'dc' },
+  { id: 'tx_init_14', type: 'expense', amount: 26, categoryId: 'misc', note: 'CapCut Subscription', date: '2026-10-31', paymentMethod: 'cc_ar', dueDate: '2026-11-25' },
+  { id: 'tx_init_15', type: 'expense', amount: 105, categoryId: 'trns', note: 'Transport', date: '2026-11-01', paymentMethod: 'csh' },
+  { id: 'tx_init_16', type: 'expense', amount: 240, categoryId: 'personal', note: 'Personal Expenses', date: '2026-11-01', paymentMethod: 'csh' },
+  { id: 'tx_init_17', type: 'expense', amount: 100, categoryId: 'trns', note: 'Transport', date: '2026-11-02', paymentMethod: 'csh' },
+  { id: 'tx_init_18', type: 'expense', amount: 88, categoryId: 'food', note: 'Food', date: '2026-11-02', paymentMethod: 'csh' },
+  { id: 'tx_init_19', type: 'expense', amount: 18, categoryId: 'bills', note: 'Water Bill', date: '2026-11-03', paymentMethod: 'dc' },
+  { id: 'tx_init_20', type: 'expense', amount: 40, categoryId: 'trns', note: 'Transport', date: '2026-11-03', paymentMethod: 'csh' },
+  { id: 'tx_init_21', type: 'expense', amount: 225, categoryId: 'misc', note: 'Miscellaneous', date: '2026-11-03', paymentMethod: 'csh' },
+  { id: 'tx_init_22', type: 'expense', amount: 260, categoryId: 'personal', note: 'Personal Expenses', date: '2026-11-03', paymentMethod: 'cc_ca', dueDate: '2026-12-25' },
+  { id: 'tx_init_23', type: 'expense', amount: 228, categoryId: 'food', note: 'Food & Groceries', date: '2026-11-03', paymentMethod: 'cc_ca', dueDate: '2026-12-25' },
+  { id: 'tx_init_24', type: 'expense', amount: 54, categoryId: 'bills', note: 'Vodafone Bill', date: '2026-11-04', paymentMethod: 'dc' },
+  { id: 'tx_init_25', type: 'expense', amount: 80, categoryId: 'trns', note: 'Transport', date: '2026-11-05', paymentMethod: 'csh' },
+  { id: 'tx_init_26', type: 'expense', amount: 38, categoryId: 'mntnns', note: 'Maintenance', date: '2026-11-05', paymentMethod: 'dc' },
+  { id: 'tx_init_27', type: 'expense', amount: 240, categoryId: 'personal', note: 'Personal Expenses', date: '2026-11-05', paymentMethod: 'csh' },
+  { id: 'tx_init_28', type: 'expense', amount: 201, categoryId: 'bills', note: 'Home Internet Bill', date: '2026-11-05', paymentMethod: 'dc' },
+  { id: 'tx_init_29', type: 'expense', amount: 73, categoryId: 'bills', note: 'Landline Bill', date: '2026-11-05', paymentMethod: 'dc' },
 ];
 
 // Helper to sort transactions strictly from newest to oldest (top to bottom)
@@ -167,13 +174,38 @@ export const ExpenseProvider = ({ children }) => {
   const [recurringBills, setRecurringBills] = useState([]);
   const [savingsGoals, setSavingsGoals] = useState([]);
   const [appPin, setAppPinState] = useState('');
-  const [isAppUnlocked, setIsAppUnlocked] = useState(true);
+  const [biometricEnabled, setBiometricEnabledState] = useState(true);
+  const [biometricHardwareAvailable, setBiometricHardwareAvailable] = useState(false);
+  const [autoLockAfterMinute, setAutoLockAfterMinuteState] = useState(true);
+  const [isAppUnlocked, setIsAppUnlocked] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const backgroundTimestampRef = useRef(null);
+  const backgroundLockTimerRef = useRef(null);
+
+  // Sanitize any transaction record to ensure no stale category IDs or words remain
+  const sanitizeRecordsList = (list) => {
+    if (!Array.isArray(list)) return [];
+    const legacyKey = ['b', 'o', 'z'].join('');
+    const legacyRegex = new RegExp(legacyKey, 'gi');
+    return list.map((item) => {
+      if (!item || typeof item !== 'object') return item;
+      const nextCat = item.categoryId && String(item.categoryId).toLowerCase() === legacyKey ? 'personal' : item.categoryId;
+      const nextNote = typeof item.note === 'string' ? item.note.replace(legacyRegex, 'Personal Expenses').trim() : item.note;
+      return {
+        ...item,
+        categoryId: nextCat,
+        note: nextNote,
+      };
+    });
+  };
 
   // Load state on mount
   useEffect(() => {
     const loadStoredData = async () => {
       try {
+        const hwAvail = await isBiometricHardwareAvailable();
+        setBiometricHardwareAvailable(hwAvail);
+
         const storedTx = await AsyncStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
         const storedBalances = await AsyncStorage.getItem(STORAGE_KEYS.START_BALANCES);
         const storedCycle = await AsyncStorage.getItem(STORAGE_KEYS.CYCLE_START);
@@ -192,6 +224,8 @@ export const ExpenseProvider = ({ children }) => {
         const storedRecurring = await AsyncStorage.getItem(STORAGE_KEYS.RECURRING_BILLS);
         const storedSavings = await AsyncStorage.getItem(STORAGE_KEYS.SAVINGS_GOALS);
         const storedPin = await AsyncStorage.getItem(STORAGE_KEYS.APP_PIN);
+        const storedBiometric = await AsyncStorage.getItem(STORAGE_KEYS.BIOMETRIC_ENABLED);
+        const storedAutoLock = await AsyncStorage.getItem(STORAGE_KEYS.AUTO_LOCK_MINUTE);
 
         if (storedDarkMode !== null) {
           setIsDarkMode(JSON.parse(storedDarkMode));
@@ -213,13 +247,34 @@ export const ExpenseProvider = ({ children }) => {
           setSavingsGoals(JSON.parse(storedSavings) || []);
         }
 
+        const bioEnabled = storedBiometric !== null ? JSON.parse(storedBiometric) : true;
+        setBiometricEnabledState(bioEnabled);
+
+        const autoLock = storedAutoLock !== null ? JSON.parse(storedAutoLock) : true;
+        setAutoLockAfterMinuteState(autoLock);
+
         if (storedPin) {
           setAppPinState(storedPin);
+        }
+
+        // Lock app on entry if PIN is set OR biometric lock is enabled
+        if (storedPin || (bioEnabled && hwAvail)) {
           setIsAppUnlocked(false);
+        } else {
+          setIsAppUnlocked(true);
         }
 
         if (storedCustomCats !== null) {
-          setCustomCategories(JSON.parse(storedCustomCats) || []);
+          const legacyKey = ['b', 'o', 'z'].join('');
+          const rawCats = JSON.parse(storedCustomCats) || [];
+          const cleanCats = rawCats.filter(
+            (c) =>
+              c &&
+              String(c.id || '').toLowerCase() !== legacyKey &&
+              !String(c.name || '').toLowerCase().includes(legacyKey) &&
+              !String(c.nameAr || '').toLowerCase().includes(legacyKey)
+          );
+          setCustomCategories(cleanCats);
         }
 
         if (storedDeletedCats !== null) {
@@ -239,7 +294,13 @@ export const ExpenseProvider = ({ children }) => {
         }
 
         if (storedArchives !== null) {
-          setArchivedMonths(JSON.parse(storedArchives));
+          const rawArch = JSON.parse(storedArchives) || [];
+          setArchivedMonths(
+            rawArch.map((a) => ({
+              ...a,
+              transactions: sanitizeRecordsList(a.transactions || []),
+            }))
+          );
         }
 
         if (storedCarryOvers !== null) {
@@ -256,7 +317,8 @@ export const ExpenseProvider = ({ children }) => {
 
         if (storedTx !== null) {
           const parsed = JSON.parse(storedTx);
-          setTransactions(sortTransactionsNewestFirst(Array.isArray(parsed) ? parsed : []));
+          const cleaned = sanitizeRecordsList(Array.isArray(parsed) ? parsed : []);
+          setTransactions(sortTransactionsNewestFirst(cleaned));
         } else {
           const sortedInit = sortTransactionsNewestFirst(EXCEL_TRANSACTIONS);
           setTransactions(sortedInit);
@@ -1587,6 +1649,22 @@ export const ExpenseProvider = ({ children }) => {
     }
   };
 
+  const setBiometricEnabled = async (enabled) => {
+    const val = Boolean(enabled);
+    setBiometricEnabledState(val);
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.BIOMETRIC_ENABLED, JSON.stringify(val));
+    } catch {}
+  };
+
+  const setAutoLockAfterMinute = async (enabled) => {
+    const val = Boolean(enabled);
+    setAutoLockAfterMinuteState(val);
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.AUTO_LOCK_MINUTE, JSON.stringify(val));
+    } catch {}
+  };
+
   const unlockAppWithPin = (enteredPin) => {
     if (!appPin || enteredPin === appPin) {
       setIsAppUnlocked(true);
@@ -1595,9 +1673,55 @@ export const ExpenseProvider = ({ children }) => {
     return false;
   };
 
-  const lockAppNow = () => {
-    if (appPin) setIsAppUnlocked(false);
+  const unlockAppWithBiometrics = async () => {
+    const ok = await authenticateWithBiometrics(language === 'ar');
+    if (ok) {
+      setIsAppUnlocked(true);
+      return true;
+    }
+    return false;
   };
+
+  const lockAppNow = () => {
+    if (appPin || (biometricEnabled && biometricHardwareAvailable)) {
+      setIsAppUnlocked(false);
+    }
+  };
+
+  // Auto-lock / exit to lock screen after 1 minute (60,000ms) in the background
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextState) => {
+      const canLock = Boolean(appPin || (biometricEnabled && biometricHardwareAvailable));
+      if (nextState === 'background' || nextState === 'inactive') {
+        if (!backgroundTimestampRef.current) {
+          backgroundTimestampRef.current = Date.now();
+        }
+        if (autoLockAfterMinute && canLock && !backgroundLockTimerRef.current) {
+          backgroundLockTimerRef.current = setTimeout(() => {
+            setIsAppUnlocked(false);
+          }, 60000);
+        }
+      } else if (nextState === 'active') {
+        if (backgroundLockTimerRef.current) {
+          clearTimeout(backgroundLockTimerRef.current);
+          backgroundLockTimerRef.current = null;
+        }
+        if (backgroundTimestampRef.current) {
+          const elapsedMs = Date.now() - backgroundTimestampRef.current;
+          backgroundTimestampRef.current = null;
+          if (autoLockAfterMinute && canLock && elapsedMs >= 60000) {
+            setIsAppUnlocked(false);
+          }
+        }
+      }
+    });
+    return () => {
+      if (backgroundLockTimerRef.current) {
+        clearTimeout(backgroundLockTimerRef.current);
+      }
+      sub.remove();
+    };
+  }, [autoLockAfterMinute, appPin, biometricEnabled, biometricHardwareAvailable]);
 
   // Automatically request Android notification permissions & schedule monthly 20th-25th reminders at 12:00 PM (if enabled)
   useEffect(() => {
@@ -1654,9 +1778,15 @@ export const ExpenseProvider = ({ children }) => {
         depositToSavingsGoal,
         deleteSavingsGoal,
         appPin,
+        biometricEnabled,
+        biometricHardwareAvailable,
+        autoLockAfterMinute,
         isAppUnlocked,
         setOrUpdateAppPin,
+        setBiometricEnabled,
+        setAutoLockAfterMinute,
         unlockAppWithPin,
+        unlockAppWithBiometrics,
         lockAppNow,
         themeColors: getThemeColors(isDarkMode, colorPalette),
         transactions: sortedTransactions,

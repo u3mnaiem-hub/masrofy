@@ -36,7 +36,7 @@ export const EXPENSE_CATEGORIES = [
     type: 'expense',
   },
   {
-    id: 'boz',
+    id: 'personal',
     name: 'Personal Expenses',
     nameAr: 'مصاريف شخصية',
     icon: 'coffee',
@@ -133,7 +133,8 @@ export const INCOME_CATEGORIES = [
 export const ALL_CATEGORIES = [...EXPENSE_CATEGORIES, ...INCOME_CATEGORIES];
 
 export const getCategoryById = (id, lang = 'en') => {
-  const found = ALL_CATEGORIES.find((cat) => cat.id === id) || {
+  const normalizedId = id && String(id).toLowerCase() === 'personal' ? 'personal' : id;
+  const found = ALL_CATEGORIES.find((cat) => cat.id === normalizedId) || {
     id: 'unknown',
     name: 'Other',
     nameAr: 'أخرى',

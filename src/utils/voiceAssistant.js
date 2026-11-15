@@ -247,8 +247,8 @@ export const parseSpokenExpense = (sentence = '', categories = [], paymentMethod
     categoryId = 'trns';
   } else if (/صيدلية|صيدليه|دواء|دوا|علاج|دكتور|كشف|طبيب|تحاليل|مستشفى|مستشفي|اسنان|أسنان|mdsn|pharmacy|doctor/i.test(s)) {
     categoryId = 'mdsn';
-  } else if (/شخصي|مصاريف شخصية|كافيه|قهوة|قهوه|شاي|ترفيه|خروجة|خروجه|سينما|نادي|هدية|هديه|boz|personal/i.test(s)) {
-    categoryId = 'boz';
+  } else if (/شخصي|مصاريف شخصية|كافيه|قهوة|قهوه|شاي|ترفيه|خروجة|خروجه|سينما|نادي|هدية|هديه|personal/i.test(s)) {
+    categoryId = 'personal';
   } else if (/صيانة|صيانه|تصليح|سباك|كهربائي|سباكة|نجار|تكييف|ثلاجة|غسالة|mntnns|maintenance/i.test(s)) {
     categoryId = 'mntnns';
   } else if (/تسوق|هدوم|ملابس|لبس|شراء|مشتريات|جزمة|شنطة|مول|misc|shopping/i.test(s)) {

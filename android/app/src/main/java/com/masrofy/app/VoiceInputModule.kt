@@ -1,7 +1,13 @@
 package com.masrofy.app
 
+import android.app.KeyguardManager
+import android.content.Context
 import android.content.Intent
+import android.hardware.biometrics.BiometricPrompt
+import android.hardware.fingerprint.FingerprintManager
+import android.os.Build
 import android.os.Bundle
+import android.os.CancellationSignal
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -12,6 +18,7 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.UiThreadUtil
 import com.facebook.react.modules.core.DeviceEventManagerModule
+import java.util.concurrent.atomic.AtomicBoolean
 
 class VoiceInputModule(private val reactContext: ReactApplicationContext) :
     ReactContextBaseJavaModule(reactContext) {
@@ -154,6 +161,88 @@ class VoiceInputModule(private val reactContext: ReactApplicationContext) :
                 promise.resolve(true)
             } catch (e: Exception) {
                 promise.resolve(false)
+            }
+        }
+    }
+
+    @ReactMethod
+    fun isBiometricAvailable(promise: Promise) {
+        UiThreadUtil.runOnUiThread {
+            try {
+                var available = false
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    @Suppress("DEPRECATION")
+                    val fpManager = reactContext.getSystemService(Context.FINGERPRINT_SERVICE) as? FingerprintManager
+                    @Suppress("DEPRECATION")
+                    if (fpManager != null && fpManager.isHardwareDetected && fpManager.hasEnrolledFingerprints()) {
+                        available = true
+                    }
+                    if (!available) {
+                        val keyguard = reactContext.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+                        if (keyguard != null && keyguard.isDeviceSecure) {
+                            available = true
+                        }
+                    }
+                }
+                promise.resolve(available)
+            } catch (e: Exception) {
+                promise.resolve(false)
+            }
+        }
+    }
+
+    @ReactMethod
+    fun authenticateBiometric(title: String, subtitle: String, cancelText: String, promise: Promise) {
+        UiThreadUtil.runOnUiThread {
+            val settled = AtomicBoolean(false)
+            fun resolveOnce(result: Boolean) {
+                if (settled.compareAndSet(false, true)) {
+                    promise.resolve(result)
+                }
+            }
+
+            try {
+                val activity = currentActivity
+                if (activity == null) {
+                    resolveOnce(false)
+                    return@runOnUiThread
+                }
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    val executor = activity.mainExecutor
+                    val cancellationSignal = CancellationSignal()
+                    val promptTitle = if (title.isNotBlank()) title else "تأكيد الهوية بالبصمة"
+                    val promptSub = if (subtitle.isNotBlank()) subtitle else "ضع إصبعك على مستشعر البصمة لفتح تطبيق مصروفي"
+                    val negText = if (cancelText.isNotBlank()) cancelText else "إلغاء"
+
+                    val builder = BiometricPrompt.Builder(activity)
+                        .setTitle(promptTitle)
+                        .setSubtitle(promptSub)
+                        .setNegativeButton(negText, executor) { _, _ ->
+                            resolveOnce(false)
+                        }
+
+                    val prompt = builder.build()
+                    prompt.authenticate(
+                        cancellationSignal,
+                        executor,
+                        object : BiometricPrompt.AuthenticationCallback() {
+                            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult?) {
+                                super.onAuthenticationSucceeded(result)
+                                resolveOnce(true)
+                            }
+
+                            override fun onAuthenticationError(errorCode: Int, errString: CharSequence?) {
+                                super.onAuthenticationError(errorCode, errString)
+                                resolveOnce(false)
+                            }
+                        }
+                    )
+                } else {
+                    resolveOnce(false)
+                }
+            } catch (e: Exception) {
+                resolveOnce(false)
             }
         }
     }

@@ -27,8 +27,8 @@ export const SetBudgetModal = ({ visible, onClose }) => {
     isArabic,
   } = useExpense();
 
-  const [cshInput, setCshInput] = useState('14500');
-  const [dcInput, setDcInput] = useState('16930');
+  const [cshInput, setCshInput] = useState('7250');
+  const [dcInput, setDcInput] = useState('8465');
   const [cycleDateInput, setCycleDateInput] = useState('2026-10-22');
   const [cycleEndInput, setCycleEndInput] = useState('2026-11-22');
   const [extraDcDeposit, setExtraDcDeposit] = useState('');
@@ -36,8 +36,8 @@ export const SetBudgetModal = ({ visible, onClose }) => {
 
   useEffect(() => {
     if (visible) {
-      setCshInput((balances?.startCsh ?? 14500).toString());
-      setDcInput((balances?.startDc ?? 16930).toString());
+      setCshInput((balances?.startCsh ?? 7250).toString());
+      setDcInput((balances?.startDc ?? 8465).toString());
       setCycleDateInput(balances?.cycleStartDate || '2026-10-22');
       setCycleEndInput(balances?.cycleEndDate || '2026-11-22');
       setExtraDcDeposit('');

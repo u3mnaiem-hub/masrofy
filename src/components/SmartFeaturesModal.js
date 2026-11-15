@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { COLORS, COLOR_PALETTES } from '../constants/theme';
+import { COLORS } from '../constants/theme';
 import { useExpense } from '../context/ExpenseContext';
 
 export const SmartFeaturesModal = ({ visible, onClose, initialTab = 'recurring' }) => {
@@ -28,14 +28,16 @@ export const SmartFeaturesModal = ({ visible, onClose, initialTab = 'recurring' 
     addSavingsGoal,
     depositToSavingsGoal,
     deleteSavingsGoal,
-    colorPalette,
-    setColorPalette,
-    appPin,
-    setOrUpdateAppPin,
     allPaymentMethods,
   } = useExpense();
 
-  const [tab, setTab] = useState(initialTab);
+  const [tab, setTab] = useState(initialTab === 'savings' ? 'savings' : 'recurring');
+
+  useEffect(() => {
+    if (visible) {
+      setTab(initialTab === 'savings' ? 'savings' : 'recurring');
+    }
+  }, [visible, initialTab]);
 
   // Recurring Bill state
   const [billTitle, setBillTitle] = useState('');
@@ -47,9 +49,6 @@ export const SmartFeaturesModal = ({ visible, onClose, initialTab = 'recurring' 
   const [goalTarget, setGoalTarget] = useState('');
   const [goalSaved, setGoalSaved] = useState('');
   const [depositAmounts, setDepositAmounts] = useState({});
-
-  // PIN state
-  const [pinInput, setPinInput] = useState(appPin || '');
 
   const handleAddBill = async () => {
     if (!billTitle.trim() || !(parseFloat(billAmount) > 0)) {
@@ -86,24 +85,6 @@ export const SmartFeaturesModal = ({ visible, onClose, initialTab = 'recurring' 
     setGoalSaved('');
   };
 
-  const handleSavePin = async () => {
-    const clean = (pinInput || '').trim();
-    if (clean && clean.length < 4) {
-      Alert.alert(
-        isArabic ? 'تنبيه' : 'Alert',
-        isArabic ? 'الرقم السري يجب أن يتكون من 4 أرقام' : 'PIN must be 4 digits'
-      );
-      return;
-    }
-    await setOrUpdateAppPin(clean);
-    Alert.alert(
-      isArabic ? 'تم الحفظ 🔒' : 'Saved 🔒',
-      clean
-        ? (isArabic ? 'تم تفعيل قفل التطبيق بالرقم السري بنجاح.' : 'App PIN lock enabled.')
-        : (isArabic ? 'تم إلغاء قفل التطبيق.' : 'App PIN lock disabled.')
-    );
-  };
-
   const curMonth = new Date().toISOString().slice(0, 7);
 
   return (
@@ -111,21 +92,20 @@ export const SmartFeaturesModal = ({ visible, onClose, initialTab = 'recurring' 
       <View style={styles.overlay}>
         <View style={[styles.sheet, isDarkMode && { backgroundColor: themeColors.surface }]}>
           {/* Header */}
-          <View style={[styles.header, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={[styles.header, isArabic && { flexDirection: 'row-reverse' }, isDarkMode && { borderBottomColor: themeColors.border }]}>
             <Text style={[styles.title, isDarkMode && { color: themeColors.textPrimary }]}>
-              {isArabic ? 'المميزات الذكية والتخصيص ✨' : 'Smart Features & Customization ✨'}
+              {isArabic ? 'الفواتير المتكررة وأهداف الادخار ✨' : 'Recurring Bills & Savings Goals ✨'}
             </Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
               <MaterialCommunityIcons name="close" size={22} color={isDarkMode ? themeColors.textPrimary : COLORS.textPrimary} />
             </TouchableOpacity>
           </View>
 
-          {/* Tabs */}
+          {/* Tabs (Only Recurring & Savings — Theme & Lock moved to Settings) */}
           <View style={[styles.tabsRow, isArabic && { flexDirection: 'row-reverse' }]}>
             {[
-              { id: 'recurring', label: isArabic ? 'فواتير متكررة 📅' : 'Recurring 📅' },
-              { id: 'savings', label: isArabic ? 'أهداف الادخار 🎯' : 'Savings 🎯' },
-              { id: 'themes', label: isArabic ? 'الثيم والقفل 🔒' : 'Theme & Lock 🔒' },
+              { id: 'recurring', label: isArabic ? 'فواتير متكررة 📅' : 'Recurring Bills 📅' },
+              { id: 'savings', label: isArabic ? 'أهداف الادخار 🎯' : 'Savings Goals 🎯' },
             ].map((t) => {
               const active = tab === t.id;
               return (
@@ -145,25 +125,52 @@ export const SmartFeaturesModal = ({ visible, onClose, initialTab = 'recurring' 
             })}
           </View>
 
-          <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 30 }}>
+          <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 34 }}>
             {tab === 'recurring' && (
               <View>
-                <Text style={[styles.secDesc, isArabic && { textAlign: 'right' }]}>
-                  {isArabic
-                    ? 'سجل مصروفاتك الشهرية الثابتة (إيجار، اشتراكات، أقساط) واضغط "تسجيل الآن" لإضافتها في ثانية واحدة.'
-                    : 'Save monthly recurring bills and record them with one tap.'}
-                </Text>
+                {/* Comprehensive Explanation Box for Recurring Bills */}
+                <View
+                  style={[
+                    styles.guideBox,
+                    {
+                      backgroundColor: isDarkMode ? themeColors.surfaceSecondary : (themeColors.primaryUltraLight || '#ECFDF5'),
+                      borderColor: themeColors.primary,
+                    },
+                  ]}
+                >
+                  <View style={[styles.guideHeaderRow, isArabic && { flexDirection: 'row-reverse' }]}>
+                    <MaterialCommunityIcons name="information-outline" size={20} color={themeColors.primaryDark} />
+                    <Text style={[styles.guideTitle, { color: isDarkMode ? themeColors.primary : themeColors.primaryDark }, isArabic && { textAlign: 'right' }]}>
+                      {isArabic ? '📖 ما هو مفهوم الفواتير المتكررة وكيف تستخدمه؟' : '📖 What are Recurring Bills & How to Use Them?'}
+                    </Text>
+                  </View>
+                  <Text style={[styles.guideBodyText, isDarkMode && { color: themeColors.textPrimary }, isArabic && { textAlign: 'right' }]}>
+                    {isArabic
+                      ? '• المفهوم: الفواتير المتكررة هي التزاماتك المالية الثابتة التي تدفعها بشكل دوري كل شهر بنفس القيمة تقريباً (مثل: إيجار السكن، فاتورة الإنترنت المنزلي، باقة الموبايل، اشتراك الجيم أو النادي، الأقساط الشهرية، أو مصاريف المدارس).\n' +
+                        '• الفائدة: بدلاً من إعادة كتابة اسم الفاتورة وقيمتها ووسيلة الدفع يدوياً كل شهر، تحفظها هنا مرة واحدة فقط كقالب جاهز.\n' +
+                        '• طريقة الاستخدام خطوة بخطوة:\n' +
+                        '  1️⃣ أدخل اسم الفاتورة ومبلغها الشهري واختر وسيلة الدفع (كاش، حساب بنكي DC، أو كارت ائتمان) ثم اضغط «إضافة للمصاريف المتكررة».\n' +
+                        '  2️⃣ عند سداد الفاتورة في أي شهر، اضغط فقط على زر «تسجيل الصرف الآن ⚡» بجانبها.\n' +
+                        '  3️⃣ سيقوم التطبيق تلقائياً بإضافتها في معاملات الشهر الحالي وخصمها من رصيدك، ويتحول الزر إلى «تم هذا الشهر ✓» باللون الأخضر لتعرف ما تم سداده وما لم يُسدد بعد!'
+                      : '• Concept: Recurring bills are fixed monthly obligations (e.g., Rent, Home Internet, Mobile Plan, Gym, Installments).\n' +
+                        '• Benefit: Save them once as templates instead of typing them manually every month.\n' +
+                        '• How to Use:\n' +
+                        '  1️⃣ Enter the bill name, monthly amount, and payment method, then tap "Add Recurring Bill".\n' +
+                        '  2️⃣ Whenever you pay the bill each month, simply tap "Record Now ⚡".\n' +
+                        '  3️⃣ It automatically logs the expense into your current month transactions and marks it as "Paid ✓" for this month!'}
+                  </Text>
+                </View>
 
                 <View style={[styles.formCard, isDarkMode && { backgroundColor: themeColors.surfaceSecondary, borderColor: themeColors.border }]}>
                   <TextInput
-                    style={[styles.input, isArabic && { textAlign: 'right' }, isDarkMode && { color: themeColors.textPrimary, borderColor: themeColors.border }]}
-                    placeholder={isArabic ? 'اسم الفاتورة (مثال: إيجار، نت، جيم)' : 'Bill Name (e.g. Rent, Internet)'}
+                    style={[styles.input, isArabic && { textAlign: 'right' }, isDarkMode && { color: themeColors.textPrimary, borderColor: themeColors.border, backgroundColor: themeColors.surface }]}
+                    placeholder={isArabic ? 'اسم الفاتورة (مثال: إيجار، نت منزلي، جيم)' : 'Bill Name (e.g. Rent, Internet)'}
                     placeholderTextColor={COLORS.textMuted}
                     value={billTitle}
                     onChangeText={setBillTitle}
                   />
                   <TextInput
-                    style={[styles.input, isArabic && { textAlign: 'right' }, isDarkMode && { color: themeColors.textPrimary, borderColor: themeColors.border }]}
+                    style={[styles.input, isArabic && { textAlign: 'right' }, isDarkMode && { color: themeColors.textPrimary, borderColor: themeColors.border, backgroundColor: themeColors.surface }]}
                     placeholder={isArabic ? 'المبلغ الشهري' : 'Monthly Amount'}
                     placeholderTextColor={COLORS.textMuted}
                     keyboardType="numeric"
@@ -208,7 +215,7 @@ export const SmartFeaturesModal = ({ visible, onClose, initialTab = 'recurring' 
                         <TouchableOpacity
                           style={[
                             styles.recordNowBtn,
-                            { backgroundColor: isPaidThisMonth ? '#059669' : '#2563EB' },
+                            { backgroundColor: isPaidThisMonth ? '#059669' : themeColors.primaryDark },
                           ]}
                           onPress={async () => {
                             await applyRecurringBillNow(b);
@@ -234,15 +241,40 @@ export const SmartFeaturesModal = ({ visible, onClose, initialTab = 'recurring' 
 
             {tab === 'savings' && (
               <View>
-                <Text style={[styles.secDesc, isArabic && { textAlign: 'right' }]}>
-                  {isArabic
-                    ? 'حدد أهدافك المالية وتابع نسبة إنجازك خطوة بخطوة في الحصالة الذكية.'
-                    : 'Set financial savings goals and track your progress.'}
-                </Text>
+                {/* Comprehensive Explanation Box for Savings Goals */}
+                <View
+                  style={[
+                    styles.guideBox,
+                    {
+                      backgroundColor: isDarkMode ? themeColors.surfaceSecondary : '#FFFBEB',
+                      borderColor: '#D97706',
+                    },
+                  ]}
+                >
+                  <View style={[styles.guideHeaderRow, isArabic && { flexDirection: 'row-reverse' }]}>
+                    <MaterialCommunityIcons name="piggy-bank-outline" size={20} color="#D97706" />
+                    <Text style={[styles.guideTitle, { color: '#B45309' }, isArabic && { textAlign: 'right' }]}>
+                      {isArabic ? '📖 كيف تستخدم أوبشن أهداف الادخار (الحصالة الذكية)؟' : '📖 How to Use Savings Goals (Smart Piggy Bank)?'}
+                    </Text>
+                  </View>
+                  <Text style={[styles.guideBodyText, isDarkMode && { color: themeColors.textPrimary }, isArabic && { textAlign: 'right' }]}>
+                    {isArabic
+                      ? '• المفهوم: أهداف الادخار هي «حصالة ذكية مستقلة» تساعدك على التخطيط وتجميع مبالغ مالية لأهدافك المستقبلية (مثل: شراء هاتف أو لابتوب، مصاريف سفر، صندوق طوارئ، أو شراء ذهب) دون الخلط بينها وبين مصاريفك اليومية.\n' +
+                        '• طريقة الاستخدام خطوة بخطوة:\n' +
+                        '  1️⃣ إنشاء الهدف: اكتب اسم الهدف (مثال: شراء لابتوب)، وحدد «المبلغ المستهدف الكلي» (مثلاً: 25,000)، وإذا كان لديك مبلغ مدخر مسبقاً اكتبه في خانة «المدخر حالياً» ثم اضغط «إنشاء هدف ادخار جديد 🎯».\n' +
+                        '  2️⃣ متابعة التقدم: سيظهر لك كارت خاص بالهدف يعرض المبلغ الذي جمعته، النسبة المئوية المنجزة (%)، والمبلغ المتبقي مع شريط تقدم بصري.\n' +
+                        '  3️⃣ تغذية الحصالة (+ إيداع): في كل مرة توفر فيها مبلغاً جديداً لهذا الهدف، اكتب المبلغ في خانة «مبلغ الإيداع +» داخل كارت الهدف واضغط «+ إيداع» ليتم إضافته فوراً وتحديث نسبة إنجازك حتى تصل إلى 100%!'
+                      : '• Concept: Savings Goals act as a Smart Piggy Bank to help you accumulate funds for future targets (e.g., Laptop, Travel, Emergency Fund).\n' +
+                        '• How to Use:\n' +
+                        '  1️⃣ Create a Goal: Enter the goal name, total target amount, and any initial saved amount, then tap "Create Savings Goal 🎯".\n' +
+                        '  2️⃣ Track Progress: View your saved amount, completion percentage (%), remaining amount, and progress bar.\n' +
+                        '  3️⃣ Deposit Anytime: Whenever you set aside more money, type the amount in "Add amount +" on the goal card and tap "+ Deposit" to update your progress!'}
+                  </Text>
+                </View>
 
                 <View style={[styles.formCard, isDarkMode && { backgroundColor: themeColors.surfaceSecondary, borderColor: themeColors.border }]}>
                   <TextInput
-                    style={[styles.input, isArabic && { textAlign: 'right' }, isDarkMode && { color: themeColors.textPrimary, borderColor: themeColors.border }]}
+                    style={[styles.input, isArabic && { textAlign: 'right' }, isDarkMode && { color: themeColors.textPrimary, borderColor: themeColors.border, backgroundColor: themeColors.surface }]}
                     placeholder={isArabic ? 'اسم الهدف (مثال: شراء لابتوب، سفر، طوارئ)' : 'Goal Name'}
                     placeholderTextColor={COLORS.textMuted}
                     value={goalTitle}
@@ -250,7 +282,7 @@ export const SmartFeaturesModal = ({ visible, onClose, initialTab = 'recurring' 
                   />
                   <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', gap: 8 }}>
                     <TextInput
-                      style={[styles.input, { flex: 1 }, isArabic && { textAlign: 'right' }, isDarkMode && { color: themeColors.textPrimary, borderColor: themeColors.border }]}
+                      style={[styles.input, { flex: 1 }, isArabic && { textAlign: 'right' }, isDarkMode && { color: themeColors.textPrimary, borderColor: themeColors.border, backgroundColor: themeColors.surface }]}
                       placeholder={isArabic ? 'المبلغ المستهدف' : 'Target Amount'}
                       placeholderTextColor={COLORS.textMuted}
                       keyboardType="numeric"
@@ -258,7 +290,7 @@ export const SmartFeaturesModal = ({ visible, onClose, initialTab = 'recurring' 
                       onChangeText={setGoalTarget}
                     />
                     <TextInput
-                      style={[styles.input, { flex: 1 }, isArabic && { textAlign: 'right' }, isDarkMode && { color: themeColors.textPrimary, borderColor: themeColors.border }]}
+                      style={[styles.input, { flex: 1 }, isArabic && { textAlign: 'right' }, isDarkMode && { color: themeColors.textPrimary, borderColor: themeColors.border, backgroundColor: themeColors.surface }]}
                       placeholder={isArabic ? 'المدخر حالياً (اختياري)' : 'Saved so far'}
                       placeholderTextColor={COLORS.textMuted}
                       keyboardType="numeric"
@@ -295,7 +327,7 @@ export const SmartFeaturesModal = ({ visible, onClose, initialTab = 'recurring' 
                       </View>
                       <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', gap: 8, alignItems: 'center' }}>
                         <TextInput
-                          style={[styles.input, { flex: 1, marginBottom: 0, paddingVertical: 6 }, isArabic && { textAlign: 'right' }, isDarkMode && { color: themeColors.textPrimary, borderColor: themeColors.border }]}
+                          style={[styles.input, { flex: 1, marginBottom: 0, paddingVertical: 6 }, isArabic && { textAlign: 'right' }, isDarkMode && { color: themeColors.textPrimary, borderColor: themeColors.border, backgroundColor: themeColors.surface }]}
                           placeholder={isArabic ? 'مبلغ الإيداع +' : 'Add amount +'}
                           placeholderTextColor={COLORS.textMuted}
                           keyboardType="numeric"
@@ -322,83 +354,6 @@ export const SmartFeaturesModal = ({ visible, onClose, initialTab = 'recurring' 
                 })}
               </View>
             )}
-
-            {tab === 'themes' && (
-              <View>
-                <Text style={[styles.secTitle, isArabic && { textAlign: 'right' }, isDarkMode && { color: themeColors.textPrimary }]}>
-                  {isArabic ? '🎨 اختيار ثيم ألوان التطبيق' : '🎨 Choose App Color Theme'}
-                </Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginVertical: 10 }}>
-                  {Object.values(COLOR_PALETTES).map((pal) => {
-                    const selected = colorPalette === pal.id;
-                    return (
-                      <TouchableOpacity
-                        key={pal.id}
-                        onPress={() => setColorPalette(pal.id)}
-                        style={{
-                          width: '47%',
-                          padding: 12,
-                          borderRadius: 12,
-                          borderWidth: 2,
-                          borderColor: selected ? pal.primary : '#CBD5E1',
-                          backgroundColor: pal.primaryUltraLight,
-                          flexDirection: isArabic ? 'row-reverse' : 'row',
-                          alignItems: 'center',
-                          gap: 8,
-                        }}
-                      >
-                        <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: pal.primary }} />
-                        <Text style={{ fontWeight: '800', fontSize: 12.5, color: '#0F172A', flex: 1, textAlign: isArabic ? 'right' : 'left' }}>
-                          {isArabic ? pal.nameAr : pal.nameEn}
-                        </Text>
-                        {selected && <MaterialCommunityIcons name="check-circle" size={18} color={pal.primary} />}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                <View style={{ height: 1, backgroundColor: '#E2E8F0', marginVertical: 14 }} />
-
-                <Text style={[styles.secTitle, isArabic && { textAlign: 'right' }, isDarkMode && { color: themeColors.textPrimary }]}>
-                  {isArabic ? '🔒 قفل التطبيق برقم سري (PIN)' : '🔒 App PIN Security Lock'}
-                </Text>
-                <Text style={[styles.secDesc, isArabic && { textAlign: 'right' }]}>
-                  {isArabic
-                    ? 'احمِ بياناتك المالية برقم سري من 4 أرقام يُطلب عند فتح التطبيق. اتركه فارغاً لإلغاء القفل.'
-                    : 'Protect your financial data with a 4-digit PIN on startup. Leave blank to disable.'}
-                </Text>
-                <TextInput
-                  style={[styles.input, isArabic && { textAlign: 'right' }, isDarkMode && { color: themeColors.textPrimary, borderColor: themeColors.border }]}
-                  placeholder={isArabic ? 'أدخل 4 أرقام (مثال: 1234)' : 'Enter 4-digit PIN'}
-                  placeholderTextColor={COLORS.textMuted}
-                  keyboardType="numeric"
-                  maxLength={4}
-                  secureTextEntry
-                  value={pinInput}
-                  onChangeText={setPinInput}
-                />
-                <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', gap: 10 }}>
-                  <TouchableOpacity style={[styles.primaryBtn, { flex: 1, backgroundColor: themeColors.primary }]} onPress={handleSavePin}>
-                    <MaterialCommunityIcons name="lock-check-outline" size={18} color="#FFFFFF" />
-                    <Text style={styles.primaryBtnText}>
-                      {isArabic ? 'حفظ إعدادات القفل' : 'Save PIN Lock'}
-                    </Text>
-                  </TouchableOpacity>
-                  {appPin ? (
-                    <TouchableOpacity
-                      style={[styles.primaryBtn, { backgroundColor: '#DC2626', paddingHorizontal: 14 }]}
-                      onPress={async () => {
-                        setPinInput('');
-                        await setOrUpdateAppPin('');
-                        Alert.alert(isArabic ? 'تم الإلغاء' : 'Disabled', isArabic ? 'تم إلغاء الرقم السري' : 'PIN disabled');
-                      }}
-                    >
-                      <Text style={styles.primaryBtnText}>{isArabic ? 'إلغاء القفل' : 'Disable'}</Text>
-                    </TouchableOpacity>
-                  ) : null}
-                </View>
-              </View>
-            )}
           </ScrollView>
         </View>
       </View>
@@ -416,7 +371,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '88%',
+    maxHeight: '90%',
   },
   header: {
     flexDirection: 'row',
@@ -427,7 +382,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E2E8F0',
   },
   title: {
-    fontSize: 16,
+    fontSize: 15.5,
     fontWeight: '900',
     color: COLORS.textPrimary,
   },
@@ -442,25 +397,38 @@ const styles = StyleSheet.create({
   },
   tabBtn: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: 9,
     borderRadius: 10,
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
   },
   tabText: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontWeight: '700',
     color: '#475569',
   },
-  secTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#0F172A',
+  guideBox: {
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    marginBottom: 14,
   },
-  secDesc: {
+  guideHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  guideTitle: {
+    fontSize: 13,
+    fontWeight: '900',
+    flex: 1,
+  },
+  guideBodyText: {
     fontSize: 11.5,
-    color: '#64748B',
-    marginBottom: 10,
+    lineHeight: 18,
+    color: '#334155',
+    fontWeight: '600',
   },
   formCard: {
     backgroundColor: '#F8FAFC',

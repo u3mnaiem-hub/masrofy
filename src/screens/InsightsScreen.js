@@ -82,7 +82,7 @@ export const InsightsScreen = () => {
 
   const monthComparison = useMemo(() => {
     const prevArch = (archivedMonths || [])[0];
-    const prevTotal = prevArch?.summary?.realTotalSpent || prevArch?.summary?.totalOutflow || 6500;
+    const prevTotal = prevArch?.summary?.realTotalSpent || prevArch?.summary?.totalOutflow || 3250;
     const prevLabel = prevArch
       ? `${prevArch.cycleStartDate} ⬅️ ${prevArch.cycleEndDate}`
       : (isArabic ? 'متوسط الشهر السابق' : 'Previous Month Baseline');
@@ -93,10 +93,10 @@ export const InsightsScreen = () => {
   }, [archivedMonths, balances.realTotalSpent, isArabic]);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={[styles.header, { alignItems: 'center', justifyContent: 'center' }]}>
+    <SafeAreaView style={[styles.safeArea, isDarkMode && { backgroundColor: themeColors.background }]}>
+      <View style={[styles.header, { alignItems: 'center', justifyContent: 'center', borderBottomColor: themeColors.primaryLight, borderBottomWidth: 2 }, isDarkMode && { backgroundColor: themeColors.surface, borderBottomColor: themeColors.border }]}>
         <View style={{ alignItems: 'center', justifyContent: 'center', width: '100%' }}>
-          <Text style={[styles.headerTitle, { textAlign: 'center' }]}>
+          <Text style={[styles.headerTitle, { textAlign: 'center', color: isDarkMode ? themeColors.primary : themeColors.primaryDark }]}>
             {isArabic ? 'لوحة التحليلات الذكية (Insights 📊)' : 'Smart Insights Dashboard 📊'}
           </Text>
           <Text style={[styles.headerSub, { textAlign: 'center' }]}>

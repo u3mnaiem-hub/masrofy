@@ -132,7 +132,7 @@ export const HistoryScreen = () => {
       {/* Top Segment Switcher: الشهر الحالي vs أرشيف الشهور */}
       <View style={[styles.tabSegmentContainer, isArabic && { flexDirection: 'row-reverse' }]}>
         <TouchableOpacity
-          style={[styles.tabSegmentBtn, activeTab === 'current' && styles.tabSegmentBtnActive]}
+          style={[styles.tabSegmentBtn, activeTab === 'current' && { backgroundColor: themeColors.primary, borderColor: themeColors.primaryDark }]}
           onPress={() => setActiveTab('current')}
           activeOpacity={0.8}
         >
@@ -147,7 +147,7 @@ export const HistoryScreen = () => {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.tabSegmentBtn, activeTab === 'archive' && styles.tabSegmentBtnActive]}
+          style={[styles.tabSegmentBtn, activeTab === 'archive' && { backgroundColor: themeColors.primary, borderColor: themeColors.primaryDark }]}
           onPress={() => setActiveTab('archive')}
           activeOpacity={0.8}
         >

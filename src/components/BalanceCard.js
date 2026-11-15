@@ -74,8 +74,8 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
     ((balances.customDebitCardsSummary || []).reduce((sum, d) => sum + (d.avail || 0), 0));
 
   return (
-    <View style={[styles.card, SHADOWS.medium, isDarkMode && { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
-      {/* 1. TOP SPOTLIGHT: المبلغ المنصرف (بالأحمر) وجنبه إجمالي البداية (بالأخضر بنفس الحجم والفونت) */}
+    <View style={[styles.card, SHADOWS.medium, { borderColor: themeColors.primaryLight, borderWidth: 1.5 }, isDarkMode && { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
+      {/* 1. TOP SPOTLIGHT: المبلغ المنصرف (بالأحمر) وجنبه إجمالي البداية (بلون الثيم بنفس الحجم والفونت) */}
       <View style={[styles.spentHeaderContainer, isArabic && { flexDirection: 'row-reverse' }]}>
         {/* المبلغ المنصرف */}
         <View style={[styles.topFigureBlock, isArabic && { alignItems: 'flex-end' }]}>
@@ -96,19 +96,19 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
         {/* فاصل وسطي خفيف */}
         <View style={styles.topVDivider} />
 
-        {/* إجمالي البداية (بنفس الحجم والفونت باللون الأخضر) */}
+        {/* إجمالي البداية (بنفس الحجم والفونت بلون الثيم المختار) */}
         <View style={[styles.topFigureBlock, isArabic && { alignItems: 'flex-start' }]}>
           <View style={[styles.figureLabelRow, isArabic && { flexDirection: 'row-reverse' }]}>
-            <MaterialCommunityIcons name="wallet-outline" size={14} color="#059669" />
-            <Text style={[styles.figureLabel, { color: '#059669' }]}>
+            <MaterialCommunityIcons name="wallet-outline" size={14} color={themeColors.primaryDark} />
+            <Text style={[styles.figureLabel, { color: isDarkMode ? themeColors.primary : themeColors.primaryDark }]}>
               {isArabic ? 'إجمالي البداية' : 'Starting Base'}
             </Text>
           </View>
           <View style={[styles.figureNumberRow, isArabic && { flexDirection: 'row-reverse' }]}>
-            <Text style={[styles.figureMainNumber, { color: '#059669' }]}>
+            <Text style={[styles.figureMainNumber, { color: isDarkMode ? themeColors.primary : themeColors.primaryDark }]}>
               {formatAmount(balances.totalStartedWith)}
             </Text>
-            <Text style={[styles.figureCurrency, { color: '#10B981' }]}> {currency.symbol}</Text>
+            <Text style={[styles.figureCurrency, { color: themeColors.primary }]}> {currency.symbol}</Text>
           </View>
         </View>
       </View>
@@ -120,9 +120,9 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
             ? `استهلاك مباشر: ${formatAmount(balances.realTotalSpent)} ${currency.symbol}`
             : `Direct Spent: ${formatAmount(balances.realTotalSpent)} ${currency.symbol}`}
         </Text>
-        <View style={[styles.cycleBadge, isArabic && { flexDirection: 'row-reverse' }]}>
-          <MaterialCommunityIcons name="calendar-clock" size={13} color={COLORS.primaryDark} />
-          <Text style={styles.cycleBadgeText}>
+        <View style={[styles.cycleBadge, { backgroundColor: themeColors.primaryLight }, isArabic && { flexDirection: 'row-reverse' }]}>
+          <MaterialCommunityIcons name="calendar-clock" size={13} color={isDarkMode ? themeColors.primary : themeColors.primaryDark} />
+          <Text style={[styles.cycleBadgeText, { color: isDarkMode ? themeColors.primary : themeColors.primaryDark }]}>
             {isArabic
               ? `مر ${balances.daysElapsed} يوم • باقي ${balances.daysLeft}`
               : `${balances.daysElapsed}d passed • ${balances.daysLeft}d left`}
@@ -168,8 +168,8 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
           style={[
             styles.consumptionBox,
             {
-              backgroundColor: isHighConsumption ? '#DC2626' : '#15803D',
-              borderColor: isHighConsumption ? '#B91C1C' : '#14532D',
+              backgroundColor: isHighConsumption ? '#DC2626' : themeColors.primaryDark,
+              borderColor: isHighConsumption ? '#B91C1C' : themeColors.primary,
             },
           ]}
         >
@@ -621,7 +621,7 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.actionBtn, styles.payCcActionBtn, isArabic && { flexDirection: 'row-reverse' }]}
+            style={[styles.actionBtn, styles.payCcActionBtn, { backgroundColor: themeColors.primaryDark }, isArabic && { flexDirection: 'row-reverse' }]}
             onPress={() => onOpenPayCc && onOpenPayCc('cc_ar')}
             activeOpacity={0.8}
           >
@@ -634,19 +634,19 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
         <View style={[styles.actionButtonsRow, { marginTop: 6 }, isArabic && { flexDirection: 'row-reverse' }]}>
           {onOpenExcelSheet && (
             <TouchableOpacity
-              style={[styles.actionBtn, styles.excelActionBtn, isArabic && { flexDirection: 'row-reverse' }]}
+              style={[styles.actionBtn, styles.excelActionBtn, { backgroundColor: themeColors.primaryLight, borderColor: themeColors.primary }, isArabic && { flexDirection: 'row-reverse' }]}
               onPress={onOpenExcelSheet}
               activeOpacity={0.8}
             >
-              <MaterialCommunityIcons name="file-excel-box" size={16} color="#047857" />
-              <Text style={[styles.actionBtnText, { color: '#065F46', fontWeight: '800' }]}>
+              <MaterialCommunityIcons name="file-excel-box" size={16} color={isDarkMode ? themeColors.primary : themeColors.primaryDark} />
+              <Text style={[styles.actionBtnText, { color: isDarkMode ? themeColors.primary : themeColors.primaryDark, fontWeight: '800' }]}>
                 {isArabic ? 'شيت إكسيل 📊' : 'Excel Sheet 📊'}
               </Text>
             </TouchableOpacity>
           )}
 
           <TouchableOpacity
-            style={[styles.actionBtn, styles.incomeActionBtn, isArabic && { flexDirection: 'row-reverse' }]}
+            style={[styles.actionBtn, styles.incomeActionBtn, { backgroundColor: themeColors.primary }, isArabic && { flexDirection: 'row-reverse' }]}
             onPress={onOpenAddIncome}
             activeOpacity={0.8}
           >

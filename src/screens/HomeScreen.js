@@ -125,16 +125,16 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
     <SafeAreaView style={[styles.safeArea, isDarkMode && { backgroundColor: themeColors.background }]}>
       <View style={[styles.container, isDarkMode && { backgroundColor: themeColors.background }]}>
         {/* Top App Header Area */}
-        <View style={[styles.headerContainer, isDarkMode && { backgroundColor: themeColors.surface, borderBottomColor: themeColors.border }]}>
+        <View style={[styles.headerContainer, { borderBottomColor: themeColors.primaryLight, borderBottomWidth: 2 }, isDarkMode && { backgroundColor: themeColors.surface, borderBottomColor: themeColors.border }]}>
           {/* Top Row: App Logo & Name (مصروفي with U3mXpns underneath) + Settings Button */}
           <View style={[styles.brandingRow, isArabic && { flexDirection: 'row-reverse' }]}>
             <View style={[styles.branding, isArabic && { flexDirection: 'row-reverse' }]}>
-              <View style={styles.appLogoCircle}>
+              <View style={[styles.appLogoCircle, { backgroundColor: themeColors.primary }]}>
                 <MaterialCommunityIcons name="wallet" size={20} color={COLORS.textWhite} />
               </View>
               <View style={[styles.nameCol, isArabic && { alignItems: 'flex-end' }]}>
-                <Text style={[styles.appNameAr, isDarkMode && { color: themeColors.primary }]}>مصروفي</Text>
-                <Text style={[styles.appNameSub, isDarkMode && { color: themeColors.textSecondary }]}>U3mXpns</Text>
+                <Text style={[styles.appNameAr, { color: isDarkMode ? themeColors.primary : themeColors.primaryDark }]}>مصروفي</Text>
+                <Text style={[styles.appNameSub, { color: isDarkMode ? themeColors.textSecondary : themeColors.primary }]}>U3mXpns</Text>
               </View>
             </View>
 
@@ -236,27 +236,6 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
               <MaterialCommunityIcons name="piggy-bank-outline" size={15} color="#D97706" />
               <Text style={[styles.syncBtnText, { color: '#D97706', fontWeight: '800' }]}>
                 {isArabic ? 'أهداف الادخار 🎯' : 'Savings 🎯'}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.syncBtn,
-                {
-                  backgroundColor: isDarkMode ? '#233044' : '#EFF6FF',
-                  borderColor: '#93C5FD',
-                  paddingHorizontal: 9,
-                },
-              ]}
-              onPress={() => {
-                setSmartModalTab('themes');
-                setSmartModalVisible(true);
-              }}
-              activeOpacity={0.7}
-            >
-              <MaterialCommunityIcons name="palette-outline" size={15} color="#2563EB" />
-              <Text style={[styles.syncBtnText, { color: '#2563EB', fontWeight: '800' }]}>
-                {isArabic ? 'الثيم والقفل 🔒' : 'Theme & Lock 🔒'}
               </Text>
             </TouchableOpacity>
 
@@ -475,7 +454,7 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
                   <View style={[styles.startItemDivider, isDarkMode && { backgroundColor: themeColors.border }]} />
 
                   <View style={styles.startItem}>
-                    <Text style={[styles.startItemVal, { color: COLORS.primaryDark }, isDarkMode && { color: themeColors.primary }]}>
+                    <Text style={[styles.startItemVal, { color: themeColors.primaryDark }, isDarkMode && { color: themeColors.primary }]}>
                       {formatAmount(balances.totalStartedWith)} {currency.symbol}
                     </Text>
                     <Text style={[styles.startItemLbl, isDarkMode && { color: themeColors.textSecondary }]}>
@@ -505,7 +484,7 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
                   </Text>
                   <TouchableOpacity
                     style={{
-                      backgroundColor: '#2563EB',
+                      backgroundColor: themeColors.primary,
                       paddingHorizontal: 12,
                       paddingVertical: 7,
                       borderRadius: 10,
@@ -529,11 +508,11 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
 
               {/* Recent Transactions Section (Ordered Newest to Oldest from the Top) */}
               <View style={[styles.sectionHeaderRow, isArabic && { flexDirection: 'row-reverse' }]}>
-                <Text style={styles.sectionTitle} numberOfLines={1}>
+                <Text style={[styles.sectionTitle, isDarkMode && { color: themeColors.textPrimary }]} numberOfLines={1}>
                   {isArabic ? 'أحدث المعاملات (الأحدث أولاً)' : 'Recent Transactions'}
                 </Text>
-                <TouchableOpacity onPress={onNavigateToHistory} style={styles.seeAllBadge} activeOpacity={0.7}>
-                  <Text style={styles.seeAllText}>
+                <TouchableOpacity onPress={onNavigateToHistory} style={[styles.seeAllBadge, { backgroundColor: themeColors.primaryLight }]} activeOpacity={0.7}>
+                  <Text style={[styles.seeAllText, { color: isDarkMode ? themeColors.primary : themeColors.primaryDark }]}>
                     {isArabic ? `عرض الكل (${monthTransactions.length})` : `View All (${monthTransactions.length})`}
                   </Text>
                 </TouchableOpacity>
