@@ -12,14 +12,15 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
     {
       id: 'csh',
       title: isArabic ? 'كاش (Cash)' : 'Cash Wallet',
-      typeBadge: isArabic ? 'محفظة نقدية' : 'CASH WALLET',
-      digits: 'CASH •••• 0001',
+      typeBadge: isArabic ? 'محفظة جيب جلدية' : 'LEATHER WALLET',
+      digits: isArabic ? 'نقدية بالمحفظة' : 'POCKET CASH',
       amount: balances.availCsh,
       subText: isArabic ? `بداية الشهر: ${formatAmount(balances.startCsh)}` : `Start: ${formatAmount(balances.startCsh)}`,
       ratio: balances.startCsh > 0 ? Math.min(100, Math.max(0, Math.round(((balances.startCsh - balances.availCsh) / balances.startCsh) * 100))) : 0,
-      bg: '#78350F',
+      bg: '#6B3410',
       accent: '#FBBF24',
       isCredit: false,
+      isWallet: true,
     },
     {
       id: 'dc',
@@ -41,8 +42,9 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
       amount: balances.ccArDebt,
       subText: isArabic ? `مستحق 25/11: ${formatAmount(balances.ccArDueThisMonth)}` : `Due 25/11: ${formatAmount(balances.ccArDueThisMonth)}`,
       ratio: Math.min(100, Math.round(((balances.ccArDebt || 0) / 10000) * 100)),
-      bg: '#0F172A',
-      accent: '#38BDF8',
+      bg: '#7DD3FC',
+      accent: '#0369A1',
+      isLightCard: true,
       isCredit: true,
     },
     {
@@ -204,56 +206,169 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ gap: 10, paddingBottom: 10, paddingHorizontal: 2 }}
         >
-          {bankCardsList.map((bc) => (
-            <TouchableOpacity
-              key={bc.id}
-              activeOpacity={0.85}
-              onPress={() => bc.isCredit && onOpenPayCc && onOpenPayCc(bc.id)}
-              style={{
-                width: 215,
-                backgroundColor: bc.bg,
-                borderRadius: 16,
-                padding: 12,
-                borderWidth: 1,
-                borderColor: bc.accent + '55',
-              }}
-            >
-              <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <MaterialCommunityIcons name="integrated-circuit-chip" size={20} color="#FBBF24" />
-                  <MaterialCommunityIcons name="contactless-payment" size={16} color="#E2E8F0" />
-                </View>
-                <View style={{ backgroundColor: bc.accent + '33', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 }}>
-                  <Text style={{ color: bc.accent, fontSize: 9, fontWeight: '800' }}>{bc.typeBadge}</Text>
-                </View>
-              </View>
+          {bankCardsList.map((bc) => {
+            if (bc.isWallet) {
+              // Leather Pocket Wallet Design for Cash
+              return (
+                <View
+                  key={bc.id}
+                  style={{
+                    width: 220,
+                    backgroundColor: '#5C2D0C',
+                    borderRadius: 22,
+                    padding: 4,
+                    borderWidth: 2,
+                    borderColor: '#3E1D06',
+                    position: 'relative',
+                  }}
+                >
+                  {/* Peeking Green Banknotes at top of wallet pocket */}
+                  <View
+                    style={{
+                      height: 6,
+                      marginHorizontal: 14,
+                      backgroundColor: '#15803D',
+                      borderTopLeftRadius: 6,
+                      borderTopRightRadius: 6,
+                      borderWidth: 1,
+                      borderColor: '#86EFAC',
+                      marginBottom: -2,
+                    }}
+                  />
+                  {/* Inner Stitched Leather Body */}
+                  <View
+                    style={{
+                      backgroundColor: '#7C3A12',
+                      borderRadius: 17,
+                      padding: 11,
+                      borderWidth: 1.5,
+                      borderStyle: 'dashed',
+                      borderColor: '#F59E0B',
+                    }}
+                  >
+                    {/* Leather Wallet Clasp / Snap Button on Left/Right edge */}
+                    <View
+                      style={{
+                        position: 'absolute',
+                        top: '42%',
+                        [isArabic ? 'left' : 'right']: -4,
+                        width: 28,
+                        height: 24,
+                        backgroundColor: '#451A03',
+                        borderTopLeftRadius: isArabic ? 4 : 12,
+                        borderBottomLeftRadius: isArabic ? 4 : 12,
+                        borderTopRightRadius: isArabic ? 12 : 4,
+                        borderBottomRightRadius: isArabic ? 12 : 4,
+                        borderWidth: 1.5,
+                        borderColor: '#D97706',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 5,
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: 5,
+                          backgroundColor: '#FBBF24',
+                          borderWidth: 1.5,
+                          borderColor: '#78350F',
+                        }}
+                      />
+                    </View>
 
-              <Text style={{ color: '#F8FAFC', fontSize: 12.5, fontWeight: '800', marginTop: 8, textAlign: isArabic ? 'right' : 'left' }} numberOfLines={1}>
-                {bc.title}
-              </Text>
-              <Text style={{ color: '#94A3B8', fontSize: 10, letterSpacing: 1, marginTop: 1, textAlign: isArabic ? 'right' : 'left' }}>
-                {bc.digits}
-              </Text>
+                    <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                        <MaterialCommunityIcons name="wallet-bifold" size={20} color="#FDE68A" />
+                        <MaterialCommunityIcons name="cash-multiple" size={16} color="#86EFAC" />
+                      </View>
+                      <View style={{ backgroundColor: '#451A03', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, borderWidth: 1, borderColor: '#D97706' }}>
+                        <Text style={{ color: '#FDE68A', fontSize: 9, fontWeight: '800' }}>{bc.typeBadge}</Text>
+                      </View>
+                    </View>
 
-              <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 8 }}>
-                <Text style={{ color: '#FFFFFF', fontSize: 17, fontWeight: '900' }}>
-                  {formatAmount(bc.amount)} <Text style={{ fontSize: 11, color: bc.accent }}>{currency.symbol}</Text>
+                    <Text style={{ color: '#FEF3C7', fontSize: 13, fontWeight: '900', marginTop: 7, textAlign: isArabic ? 'right' : 'left' }} numberOfLines={1}>
+                      {bc.title}
+                    </Text>
+                    <Text style={{ color: '#FCD34D', fontSize: 9.5, fontWeight: '700', marginTop: 1, textAlign: isArabic ? 'right' : 'left' }}>
+                      {bc.digits}
+                    </Text>
+
+                    <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 6 }}>
+                      <Text style={{ color: '#FFFFFF', fontSize: 17, fontWeight: '900' }}>
+                        {formatAmount(bc.amount)} <Text style={{ fontSize: 11, color: '#FDE68A' }}>{currency.symbol}</Text>
+                      </Text>
+                    </View>
+
+                    <View style={{ height: 4, backgroundColor: '#451A03', borderRadius: 3, marginTop: 6, overflow: 'hidden' }}>
+                      <View style={{ width: `${Math.max(5, bc.ratio)}%`, height: '100%', backgroundColor: '#FBBF24' }} />
+                    </View>
+                    <Text style={{ color: '#FDE68A', fontSize: 9.5, marginTop: 4, textAlign: isArabic ? 'right' : 'left' }} numberOfLines={1}>
+                      {bc.subText}
+                    </Text>
+                  </View>
+                </View>
+              );
+            }
+
+            const titleColor = bc.isLightCard ? '#082F49' : '#F8FAFC';
+            const digitsColor = bc.isLightCard ? '#0369A1' : '#94A3B8';
+            const amountColor = bc.isLightCard ? '#0C4A6E' : '#FFFFFF';
+            const subColor = bc.isLightCard ? '#075985' : '#CBD5E1';
+            const barBg = bc.isLightCard ? '#BAE6FD' : '#334155';
+
+            return (
+              <TouchableOpacity
+                key={bc.id}
+                activeOpacity={0.85}
+                onPress={() => bc.isCredit && onOpenPayCc && onOpenPayCc(bc.id)}
+                style={{
+                  width: 215,
+                  backgroundColor: bc.bg,
+                  borderRadius: 16,
+                  padding: 12,
+                  borderWidth: 1.5,
+                  borderColor: bc.isLightCard ? '#0284C7' : bc.accent + '55',
+                }}
+              >
+                <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <MaterialCommunityIcons name="integrated-circuit-chip" size={20} color={bc.isLightCard ? '#D97706' : '#FBBF24'} />
+                    <MaterialCommunityIcons name="contactless-payment" size={16} color={bc.isLightCard ? '#0C4A6E' : '#E2E8F0'} />
+                  </View>
+                  <View style={{ backgroundColor: bc.isLightCard ? '#E0F2FE' : bc.accent + '33', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 }}>
+                    <Text style={{ color: bc.accent, fontSize: 9, fontWeight: '800' }}>{bc.typeBadge}</Text>
+                  </View>
+                </View>
+
+                <Text style={{ color: titleColor, fontSize: 12.5, fontWeight: '800', marginTop: 8, textAlign: isArabic ? 'right' : 'left' }} numberOfLines={1}>
+                  {bc.title}
                 </Text>
-                {bc.isCredit && (
-                  <Text style={{ color: bc.accent, fontSize: 10, fontWeight: '800' }}>
-                    {isArabic ? 'سداد 💳' : 'Pay 💳'}
-                  </Text>
-                )}
-              </View>
+                <Text style={{ color: digitsColor, fontSize: 10, letterSpacing: 1, marginTop: 1, textAlign: isArabic ? 'right' : 'left' }}>
+                  {bc.digits}
+                </Text>
 
-              <View style={{ height: 4, backgroundColor: '#334155', borderRadius: 3, marginTop: 6, overflow: 'hidden' }}>
-                <View style={{ width: `${Math.max(5, bc.ratio)}%`, height: '100%', backgroundColor: bc.accent }} />
-              </View>
-              <Text style={{ color: '#CBD5E1', fontSize: 9.5, marginTop: 4, textAlign: isArabic ? 'right' : 'left' }} numberOfLines={1}>
-                {bc.subText}
-              </Text>
-            </TouchableOpacity>
-          ))}
+                <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 8 }}>
+                  <Text style={{ color: amountColor, fontSize: 17, fontWeight: '900' }}>
+                    {formatAmount(bc.amount)} <Text style={{ fontSize: 11, color: bc.accent }}>{currency.symbol}</Text>
+                  </Text>
+                  {bc.isCredit && (
+                    <Text style={{ color: bc.accent, fontSize: 10, fontWeight: '800' }}>
+                      {isArabic ? 'سداد 💳' : 'Pay 💳'}
+                    </Text>
+                  )}
+                </View>
+
+                <View style={{ height: 4, backgroundColor: barBg, borderRadius: 3, marginTop: 6, overflow: 'hidden' }}>
+                  <View style={{ width: `${Math.max(5, bc.ratio)}%`, height: '100%', backgroundColor: bc.accent }} />
+                </View>
+                <Text style={{ color: subColor, fontSize: 9.5, marginTop: 4, textAlign: isArabic ? 'right' : 'left' }} numberOfLines={1}>
+                  {bc.subText}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
       )}
 
