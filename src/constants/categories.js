@@ -151,11 +151,11 @@ export const getCategoryById = (id, lang = 'en') => {
 export const PAYMENT_METHODS = [
   {
     id: 'csh',
-    name: 'Available Cash 💵',
-    nameAr: 'كاش متاح (Available Cash) 💵',
+    name: 'Cash 💵',
+    nameAr: 'كاش (Cash) 💵',
     icon: 'cash',
     shortName: 'Cash',
-    shortNameAr: 'كاش متاح',
+    shortNameAr: 'كاش',
   },
   {
     id: 'dc',

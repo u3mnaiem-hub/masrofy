@@ -20,8 +20,80 @@ import { COLORS } from './src/constants/theme';
 
 function MainApp() {
   const [activeTab, setActiveTab] = useState('home');
-  const { isArabic, isDarkMode, themeColors } = useExpense();
+  const [enteredPin, setEnteredPin] = useState('');
+  const [pinError, setPinError] = useState(false);
+  const { isArabic, isDarkMode, themeColors, appPin, isAppUnlocked, unlockAppWithPin } = useExpense();
   const insets = useSafeAreaInsets();
+
+  if (appPin && !isAppUnlocked) {
+    const onDigitPress = (d) => {
+      const next = (enteredPin + d).slice(0, 4);
+      setEnteredPin(next);
+      setPinError(false);
+      if (next.length === 4) {
+        const ok = unlockAppWithPin(next);
+        if (!ok) {
+          setPinError(true);
+          setEnteredPin('');
+        } else {
+          setEnteredPin('');
+        }
+      }
+    };
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#0F172A', padding: 24 }]}>
+        <StatusBar style="light" backgroundColor="#0F172A" />
+        <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: themeColors.primary, justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
+          <MaterialCommunityIcons name="lock" size={32} color="#FFFFFF" />
+        </View>
+        <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '900', marginBottom: 6 }}>
+          {isArabic ? 'مصروفي مقفل 🔒' : 'Masrofy is Locked 🔒'}
+        </Text>
+        <Text style={{ color: '#94A3B8', fontSize: 13, marginBottom: 22 }}>
+          {pinError
+            ? (isArabic ? '❌ الرقم السري غير صحيح، حاول مرة أخرى' : '❌ Incorrect PIN, try again')
+            : (isArabic ? 'أدخل الرقم السري المكون من 4 أرقام للمتابعة' : 'Enter your 4-digit PIN to unlock')}
+        </Text>
+        <View style={{ flexDirection: 'row', gap: 14, marginBottom: 28 }}>
+          {[0, 1, 2, 3].map((i) => (
+            <View
+              key={i}
+              style={{
+                width: 16,
+                height: 16,
+                borderRadius: 8,
+                backgroundColor: enteredPin.length > i ? themeColors.primary : '#334155',
+              }}
+            />
+          ))}
+        </View>
+        <View style={{ width: 250, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 14 }}>
+          {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'].map((k) => (
+            <TouchableOpacity
+              key={k}
+              onPress={() => {
+                if (k === 'C') setEnteredPin('');
+                else if (k === '⌫') setEnteredPin((p) => p.slice(0, -1));
+                else onDigitPress(k);
+              }}
+              style={{
+                width: 68,
+                height: 60,
+                borderRadius: 16,
+                backgroundColor: '#1E293B',
+                justifyContent: 'center',
+                alignItems: 'center',
+                borderWidth: 1,
+                borderColor: '#334155',
+              }}
+            >
+              <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '800' }}>{k}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+    );
+  }
 
   const renderScreen = () => {
     switch (activeTab) {

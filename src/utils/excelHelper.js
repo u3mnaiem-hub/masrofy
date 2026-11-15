@@ -55,7 +55,7 @@ export const generateAllRecordsExcelBase64 = ({
     const amt = parseFloat(t.amount) || 0;
 
     let pmName = t.paymentMethod || '';
-    if (t.paymentMethod === 'csh') pmName = 'كاش متاح';
+    if (t.paymentMethod === 'csh') pmName = 'كاش';
     else if (t.paymentMethod === 'dc') pmName = 'DC / حساب بنكي';
     else if (t.paymentMethod === 'cc_ar') pmName = 'البنك العربي (CC AR)';
     else if (t.paymentMethod === 'cc_ca') pmName = 'كريدي أجريكول (CC CA)';
@@ -90,7 +90,7 @@ export const generateAllRecordsExcelBase64 = ({
       const amt = parseFloat(t.amount) || 0;
 
       let pmName = t.paymentMethod || '';
-      if (t.paymentMethod === 'csh') pmName = 'كاش متاح';
+      if (t.paymentMethod === 'csh') pmName = 'كاش';
       else if (t.paymentMethod === 'dc') pmName = 'DC / حساب بنكي';
       else if (t.paymentMethod === 'cc_ar') pmName = 'البنك العربي (CC AR)';
       else if (t.paymentMethod === 'cc_ca') pmName = 'كريدي أجريكول (CC CA)';

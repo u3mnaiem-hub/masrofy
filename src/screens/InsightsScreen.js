@@ -21,6 +21,9 @@ export const InsightsScreen = () => {
     isArabic,
     isCreditCardMethod,
     getAccountById,
+    archivedMonths,
+    isDarkMode,
+    themeColors,
   } = useExpense();
 
   const { width: winWidth } = useWindowDimensions();
@@ -76,6 +79,18 @@ export const InsightsScreen = () => {
   }, [monthTransactions, isCreditCardMethod]);
 
   const topCategory = categoryBreakdown.length > 0 ? categoryBreakdown[0] : null;
+
+  const monthComparison = useMemo(() => {
+    const prevArch = (archivedMonths || [])[0];
+    const prevTotal = prevArch?.summary?.realTotalSpent || prevArch?.summary?.totalOutflow || 6500;
+    const prevLabel = prevArch
+      ? `${prevArch.cycleStartDate} ⬅️ ${prevArch.cycleEndDate}`
+      : (isArabic ? 'متوسط الشهر السابق' : 'Previous Month Baseline');
+    const curTotal = balances.realTotalSpent || 0;
+    const diff = curTotal - prevTotal;
+    const diffPct = prevTotal > 0 ? Math.round((Math.abs(diff) / prevTotal) * 100) : 0;
+    return { prevTotal, prevLabel, curTotal, diff, diffPct, isSaving: diff <= 0 };
+  }, [archivedMonths, balances.realTotalSpent, isArabic]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -160,6 +175,37 @@ export const InsightsScreen = () => {
                 ? `⚠️ تنبيه: الرصيد يكفي لـ ${balances.daysMoneyLasts} يوماً (${balances.daysLeft} يوم متبقي في الدورة)`
                 : `⚠️ Alert: Balance covers ${balances.daysMoneyLasts} days (${balances.daysLeft} days left in this cycle)`}
             </Text>
+          </View>
+        </View>
+
+        {/* 1.5 MONTH-OVER-MONTH SMART COMPARISON */}
+        <View style={[styles.card, SHADOWS.small, isDarkMode && { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
+          <View style={[styles.cardHeader, isArabic && { alignItems: 'flex-end' }]}>
+            <Text style={[styles.cardTitle, isDarkMode && { color: themeColors.textPrimary }]}>
+              {isArabic ? 'مقارنة ذكية بين الشهور 📈' : 'Month-over-Month Smart Comparison 📈'}
+            </Text>
+            <Text style={styles.cardSub}>
+              {monthComparison.prevLabel}
+            </Text>
+          </View>
+          <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: monthComparison.isSaving ? '#ECFDF5' : '#FEF2F2', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: monthComparison.isSaving ? '#6EE7B7' : '#FECACA' }}>
+            <View style={{ flex: 1, alignItems: isArabic ? 'flex-end' : 'flex-start' }}>
+              <Text style={{ fontSize: 13, fontWeight: '900', color: monthComparison.isSaving ? '#047857' : '#B91C1C' }}>
+                {monthComparison.isSaving
+                  ? (isArabic ? `🎉 وفرت ${monthComparison.diffPct}% مقارنة بالشهر السابق!` : `🎉 Saved ${monthComparison.diffPct}% vs Previous Month!`)
+                  : (isArabic ? `⚠️ زيادة ${monthComparison.diffPct}% عن الشهر السابق` : `⚠️ Up ${monthComparison.diffPct}% vs Previous Month`)}
+              </Text>
+              <Text style={{ fontSize: 11.5, color: '#475569', marginTop: 3 }}>
+                {isArabic
+                  ? `الشهر الحالي: ${formatAmount(monthComparison.curTotal)} ${currency.symbol} • السابق: ${formatAmount(monthComparison.prevTotal)} ${currency.symbol}`
+                  : `Current: ${formatAmount(monthComparison.curTotal)} ${currency.symbol} • Previous: ${formatAmount(monthComparison.prevTotal)} ${currency.symbol}`}
+              </Text>
+            </View>
+            <MaterialCommunityIcons
+              name={monthComparison.isSaving ? 'trending-down' : 'trending-up'}
+              size={28}
+              color={monthComparison.isSaving ? '#059669' : '#DC2626'}
+            />
           </View>
         </View>
 

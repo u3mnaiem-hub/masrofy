@@ -151,7 +151,7 @@ export const RolloverModal = ({ visible, onClose }) => {
               {isArabic ? '2) أرصدة البداية الجديدة (من المتبقي)' : '2) New starting balances (from what is left)'}
             </Text>
             <View style={styles.card}>
-              <Row label={isArabic ? '💵 كاش متاح' : '💵 Available Cash'} to={nextCash} color="#059669" />
+              <Row label={isArabic ? '💵 كاش' : '💵 Cash'} to={nextCash} color="#059669" />
               <Row label={isArabic ? '🏦 DC / حساب بنكي' : '🏦 DC / Bank Account'} to={nextDc} color="#2563EB" />
               {customDebits.map((d) => (
                 <Row key={d.id} label={`🏦 ${d.bankName} (DC)`} to={Math.max(0, Math.round(d.avail))} color="#2563EB" />

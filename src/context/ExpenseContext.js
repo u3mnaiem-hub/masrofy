@@ -26,6 +26,11 @@ const STORAGE_KEYS = {
   CUSTOM_CATEGORIES: '@u3mxpns_v10_custom_categories',
   DELETED_CATEGORIES: '@u3mxpns_v10_deleted_categories',
   DARK_MODE: '@u3mxpns_v10_dark_mode',
+  COLOR_PALETTE: '@u3mxpns_v10_color_palette',
+  RECURRING_BILLS: '@u3mxpns_v10_recurring_bills',
+  SAVINGS_GOALS: '@u3mxpns_v10_savings_goals',
+  APP_PIN: '@u3mxpns_v10_app_pin',
+  HIDE_BALANCES: '@u3mxpns_v10_hide_balances',
 };
 
 // Initial starting funds matching Excel Sheet1 row 4 exactly
@@ -157,6 +162,12 @@ export const ExpenseProvider = ({ children }) => {
   const [customCategories, setCustomCategories] = useState([]);
   const [deletedCategoryIds, setDeletedCategoryIds] = useState([]);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [colorPalette, setColorPaletteState] = useState('emerald');
+  const [isBalancesHidden, setIsBalancesHidden] = useState(false);
+  const [recurringBills, setRecurringBills] = useState([]);
+  const [savingsGoals, setSavingsGoals] = useState([]);
+  const [appPin, setAppPinState] = useState('');
+  const [isAppUnlocked, setIsAppUnlocked] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
 
   // Load state on mount
@@ -176,9 +187,35 @@ export const ExpenseProvider = ({ children }) => {
         const storedCustomCats = await AsyncStorage.getItem(STORAGE_KEYS.CUSTOM_CATEGORIES);
         const storedDeletedCats = await AsyncStorage.getItem(STORAGE_KEYS.DELETED_CATEGORIES);
         const storedDarkMode = await AsyncStorage.getItem(STORAGE_KEYS.DARK_MODE);
+        const storedPalette = await AsyncStorage.getItem(STORAGE_KEYS.COLOR_PALETTE);
+        const storedHideBalances = await AsyncStorage.getItem(STORAGE_KEYS.HIDE_BALANCES);
+        const storedRecurring = await AsyncStorage.getItem(STORAGE_KEYS.RECURRING_BILLS);
+        const storedSavings = await AsyncStorage.getItem(STORAGE_KEYS.SAVINGS_GOALS);
+        const storedPin = await AsyncStorage.getItem(STORAGE_KEYS.APP_PIN);
 
         if (storedDarkMode !== null) {
           setIsDarkMode(JSON.parse(storedDarkMode));
+        }
+
+        if (storedPalette) {
+          setColorPaletteState(storedPalette);
+        }
+
+        if (storedHideBalances !== null) {
+          setIsBalancesHidden(JSON.parse(storedHideBalances));
+        }
+
+        if (storedRecurring !== null) {
+          setRecurringBills(JSON.parse(storedRecurring) || []);
+        }
+
+        if (storedSavings !== null) {
+          setSavingsGoals(JSON.parse(storedSavings) || []);
+        }
+
+        if (storedPin) {
+          setAppPinState(storedPin);
+          setIsAppUnlocked(false);
         }
 
         if (storedCustomCats !== null) {
@@ -534,6 +571,7 @@ export const ExpenseProvider = ({ children }) => {
       dueDate,
       toAccount: data.toAccount || null,
       targetCard: data.targetCard || null,
+      receiptUri: data.receiptUri || null,
       createdAt: Date.now(),
     };
 
@@ -1326,6 +1364,9 @@ export const ExpenseProvider = ({ children }) => {
         customAccounts,
         archivedMonths,
         categoryBudgets,
+        recurringBills,
+        savingsGoals,
+        colorPalette,
       },
     };
   };
@@ -1372,6 +1413,14 @@ export const ExpenseProvider = ({ children }) => {
     if (d.categoryBudgets && typeof d.categoryBudgets === 'object') {
       setCategoryBudgets(d.categoryBudgets);
       await AsyncStorage.setItem(STORAGE_KEYS.CATEGORY_BUDGETS, JSON.stringify(d.categoryBudgets));
+    }
+    if (Array.isArray(d.recurringBills)) {
+      setRecurringBills(d.recurringBills);
+      await AsyncStorage.setItem(STORAGE_KEYS.RECURRING_BILLS, JSON.stringify(d.recurringBills));
+    }
+    if (Array.isArray(d.savingsGoals)) {
+      setSavingsGoals(d.savingsGoals);
+      await AsyncStorage.setItem(STORAGE_KEYS.SAVINGS_GOALS, JSON.stringify(d.savingsGoals));
     }
     return true;
   };
@@ -1429,12 +1478,125 @@ export const ExpenseProvider = ({ children }) => {
     return list.sort((a, b) => b.total - a.total);
   }, [sortedTransactions, balances.realTotalSpent, language]);
 
-  const formatAmount = (num) => {
+  const formatAmount = (num, opts) => {
+    if (isBalancesHidden && !opts?.ignorePrivacy) {
+      return '••••';
+    }
     const val = parseFloat(num) || 0;
     return val.toLocaleString('en-US', {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     });
+  };
+
+  const toggleHideBalances = async () => {
+    setIsBalancesHidden((prev) => {
+      const next = !prev;
+      AsyncStorage.setItem(STORAGE_KEYS.HIDE_BALANCES, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  };
+
+  const setColorPalette = async (paletteId) => {
+    setColorPaletteState(paletteId);
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.COLOR_PALETTE, paletteId);
+    } catch {}
+  };
+
+  const addRecurringBill = async ({ title, amount, categoryId = 'bills', paymentMethod = 'csh', dayOfMonth = 1 }) => {
+    const newBill = {
+      id: 'rec_' + Date.now(),
+      title: (title || '').trim() || (language === 'ar' ? 'فاتورة شهرية' : 'Monthly Bill'),
+      amount: parseFloat(amount) || 0,
+      categoryId,
+      paymentMethod,
+      dayOfMonth: parseInt(dayOfMonth, 10) || 1,
+      lastPaidMonth: null,
+    };
+    const updated = [newBill, ...recurringBills];
+    setRecurringBills(updated);
+    await AsyncStorage.setItem(STORAGE_KEYS.RECURRING_BILLS, JSON.stringify(updated));
+    return newBill;
+  };
+
+  const deleteRecurringBill = async (id) => {
+    const updated = recurringBills.filter((b) => b.id !== id);
+    setRecurringBills(updated);
+    await AsyncStorage.setItem(STORAGE_KEYS.RECURRING_BILLS, JSON.stringify(updated));
+  };
+
+  const applyRecurringBillNow = async (bill) => {
+    if (!bill) return null;
+    const tx = await addTransaction({
+      type: 'expense',
+      amount: bill.amount,
+      categoryId: bill.categoryId || 'bills',
+      paymentMethod: bill.paymentMethod || 'csh',
+      note: `${bill.title} (${language === 'ar' ? 'دوري' : 'Recurring'})`,
+      date: new Date().toISOString().split('T')[0],
+    });
+    const curMonth = new Date().toISOString().slice(0, 7);
+    const updated = recurringBills.map((b) => (b.id === bill.id ? { ...b, lastPaidMonth: curMonth } : b));
+    setRecurringBills(updated);
+    await AsyncStorage.setItem(STORAGE_KEYS.RECURRING_BILLS, JSON.stringify(updated));
+    return tx;
+  };
+
+  const addSavingsGoal = async ({ title, targetAmount, savedAmount = 0, icon = 'piggy-bank-outline', color = '#10B981' }) => {
+    const newGoal = {
+      id: 'goal_' + Date.now(),
+      title: (title || '').trim() || (language === 'ar' ? 'هدف ادخار' : 'Savings Goal'),
+      targetAmount: parseFloat(targetAmount) || 1000,
+      savedAmount: parseFloat(savedAmount) || 0,
+      icon,
+      color,
+      createdAt: Date.now(),
+    };
+    const updated = [newGoal, ...savingsGoals];
+    setSavingsGoals(updated);
+    await AsyncStorage.setItem(STORAGE_KEYS.SAVINGS_GOALS, JSON.stringify(updated));
+    return newGoal;
+  };
+
+  const depositToSavingsGoal = async (goalId, addAmt) => {
+    const delta = parseFloat(addAmt) || 0;
+    if (delta === 0) return;
+    const updated = savingsGoals.map((g) =>
+      g.id === goalId ? { ...g, savedAmount: Math.max(0, (parseFloat(g.savedAmount) || 0) + delta) } : g
+    );
+    setSavingsGoals(updated);
+    await AsyncStorage.setItem(STORAGE_KEYS.SAVINGS_GOALS, JSON.stringify(updated));
+  };
+
+  const deleteSavingsGoal = async (goalId) => {
+    const updated = savingsGoals.filter((g) => g.id !== goalId);
+    setSavingsGoals(updated);
+    await AsyncStorage.setItem(STORAGE_KEYS.SAVINGS_GOALS, JSON.stringify(updated));
+  };
+
+  const setOrUpdateAppPin = async (newPin) => {
+    const clean = (newPin || '').trim();
+    setAppPinState(clean);
+    if (clean) {
+      setIsAppUnlocked(true);
+      await AsyncStorage.setItem(STORAGE_KEYS.APP_PIN, clean);
+    } else {
+      setIsAppUnlocked(true);
+      await AsyncStorage.removeItem(STORAGE_KEYS.APP_PIN);
+    }
+  };
+
+  const unlockAppWithPin = (enteredPin) => {
+    if (!appPin || enteredPin === appPin) {
+      setIsAppUnlocked(true);
+      return true;
+    }
+    return false;
+  };
+
+  const lockAppNow = () => {
+    if (appPin) setIsAppUnlocked(false);
   };
 
   // Automatically request Android notification permissions & schedule monthly 20th-25th reminders at 12:00 PM (if enabled)
@@ -1479,7 +1641,24 @@ export const ExpenseProvider = ({ children }) => {
       value={{
         isDarkMode,
         toggleDarkMode,
-        themeColors: getThemeColors(isDarkMode),
+        colorPalette,
+        setColorPalette,
+        isBalancesHidden,
+        toggleHideBalances,
+        recurringBills,
+        addRecurringBill,
+        deleteRecurringBill,
+        applyRecurringBillNow,
+        savingsGoals,
+        addSavingsGoal,
+        depositToSavingsGoal,
+        deleteSavingsGoal,
+        appPin,
+        isAppUnlocked,
+        setOrUpdateAppPin,
+        unlockAppWithPin,
+        lockAppNow,
+        themeColors: getThemeColors(isDarkMode, colorPalette),
         transactions: sortedTransactions,
         monthTransactions: sortedTransactions,
         selectedMonth: '2026-11',

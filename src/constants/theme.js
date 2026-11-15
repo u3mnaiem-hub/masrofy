@@ -92,7 +92,75 @@ export const DARK_COLORS = {
   indigoLight: '#272B42',
 };
 
-export const getThemeColors = (isDarkMode) => (isDarkMode ? DARK_COLORS : COLORS);
+export const COLOR_PALETTES = {
+  emerald: {
+    id: 'emerald',
+    nameAr: 'الأخضر الزمردي',
+    nameEn: 'Emerald',
+    primary: '#10B981',
+    primaryDark: '#059669',
+    primaryLight: '#D1FAE5',
+    primaryUltraLight: '#ECFDF5',
+    darkPrimary: '#34D399',
+    darkPrimaryDark: '#10B981',
+    darkPrimaryLight: '#1E3A32',
+  },
+  royalBlue: {
+    id: 'royalBlue',
+    nameAr: 'الأزرق الملكي',
+    nameEn: 'Royal Blue',
+    primary: '#2563EB',
+    primaryDark: '#1D4ED8',
+    primaryLight: '#DBEAFE',
+    primaryUltraLight: '#EFF6FF',
+    darkPrimary: '#60A5FA',
+    darkPrimaryDark: '#3B82F6',
+    darkPrimaryLight: '#1E293B',
+  },
+  gold: {
+    id: 'gold',
+    nameAr: 'الذهبي الفاخر',
+    nameEn: 'Royal Gold',
+    primary: '#D97706',
+    primaryDark: '#B45309',
+    primaryLight: '#FEF3C7',
+    primaryUltraLight: '#FFFBEB',
+    darkPrimary: '#FBBF24',
+    darkPrimaryDark: '#D97706',
+    darkPrimaryLight: '#3A301F',
+  },
+  purple: {
+    id: 'purple',
+    nameAr: 'البنفسجي الملكي',
+    nameEn: 'Royal Purple',
+    primary: '#7C3AED',
+    primaryDark: '#6D28D9',
+    primaryLight: '#EDE9FE',
+    primaryUltraLight: '#F5F3FF',
+    darkPrimary: '#A78BFA',
+    darkPrimaryDark: '#8B5CF6',
+    darkPrimaryLight: '#2E2842',
+  },
+};
+
+export const getThemeColors = (isDarkMode, paletteId = 'emerald') => {
+  const pal = COLOR_PALETTES[paletteId] || COLOR_PALETTES.emerald;
+  if (isDarkMode) {
+    return {
+      ...DARK_COLORS,
+      primary: pal.darkPrimary,
+      primaryDark: pal.darkPrimaryDark,
+      primaryLight: pal.darkPrimaryLight,
+    };
+  }
+  return {
+    ...COLORS,
+    primary: pal.primary,
+    primaryDark: pal.primaryDark,
+    primaryLight: pal.primaryLight,
+    primaryUltraLight: pal.primaryUltraLight,
+  };
+};
 
 export const SHADOWS = {
   small: {

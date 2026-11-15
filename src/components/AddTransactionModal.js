@@ -10,7 +10,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Image,
 } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS } from '../constants/theme';
 import {
@@ -61,6 +64,26 @@ export const AddTransactionModal = ({
   const [paymentMethod, setPaymentMethod] = useState('csh');
   const [toAccount, setToAccount] = useState('dc');
   const [targetCard, setTargetCard] = useState(initialTargetCard || 'cc_ar');
+  const [receiptUri, setReceiptUri] = useState(null);
+
+  const handlePickReceiptImage = async () => {
+    try {
+      const res = await DocumentPicker.getDocumentAsync({
+        type: ['image/*'],
+        copyToCacheDirectory: true,
+      });
+      if (!res.canceled && res.assets && res.assets.length > 0) {
+        const pickedUri = res.assets[0].uri;
+        try {
+          const dest = `${FileSystem.documentDirectory}receipt_${Date.now()}.jpg`;
+          await FileSystem.copyAsync({ from: pickedUri, to: dest });
+          setReceiptUri(dest);
+        } catch {
+          setReceiptUri(pickedUri);
+        }
+      }
+    } catch {}
+  };
 
   // Voice Assistant & Custom Category States
   const [oneLineSentence, setOneLineSentence] = useState('');
@@ -194,6 +217,7 @@ export const AddTransactionModal = ({
         setTargetCard(editingTransaction.targetCard || initialTargetCard || 'cc_ar');
         setNote(editingTransaction.note || '');
         setDate(editingTransaction.date || new Date().toISOString().split('T')[0]);
+        setReceiptUri(editingTransaction.receiptUri || null);
         setOneLineSentence('');
         return;
       }
@@ -201,6 +225,7 @@ export const AddTransactionModal = ({
       const initM = initialType === 'cc_pyd' ? 'cc_pyd' : (initialType === 'switch' ? 'switch' : (initialType === 'income' ? 'income' : 'expense'));
       setMode(initM);
       setAmount('');
+      setReceiptUri(null);
       setOneLineSentence('');
       setDate(new Date().toISOString().split('T')[0]);
 
@@ -703,6 +728,7 @@ export const AddTransactionModal = ({
         paymentMethod,
         toAccount: mode === 'switch' ? toAccount : null,
         targetCard: mode === 'cc_pyd' ? targetCard : null,
+        receiptUri: receiptUri || null,
       });
       onClose();
       return;
@@ -717,6 +743,7 @@ export const AddTransactionModal = ({
       paymentMethod,
       toAccount: mode === 'switch' ? toAccount : null,
       targetCard: mode === 'cc_pyd' ? targetCard : null,
+      receiptUri: receiptUri || null,
     });
 
     onClose();
@@ -1579,6 +1606,47 @@ export const AddTransactionModal = ({
               placeholderTextColor={COLORS.textMuted}
               textAlign={isArabic ? 'right' : 'left'}
             />
+
+            {/* Receipt Image Attachment */}
+            <View style={{ marginTop: 10, marginBottom: 6 }}>
+              <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 10 }}>
+                <TouchableOpacity
+                  onPress={handlePickReceiptImage}
+                  style={{
+                    flexDirection: isArabic ? 'row-reverse' : 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    paddingHorizontal: 12,
+                    paddingVertical: 9,
+                    borderRadius: 10,
+                    backgroundColor: '#F0FDF4',
+                    borderWidth: 1,
+                    borderColor: '#86EFAC',
+                  }}
+                >
+                  <MaterialCommunityIcons name="camera-plus-outline" size={18} color="#059669" />
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#059669' }}>
+                    {receiptUri
+                      ? (isArabic ? 'تغيير صورة الفاتورة 🧾' : 'Change Receipt 🧾')
+                      : (isArabic ? 'إرفاق صورة الفاتورة / الإيصال 📷' : 'Attach Receipt Image 📷')}
+                  </Text>
+                </TouchableOpacity>
+                {receiptUri && (
+                  <TouchableOpacity
+                    onPress={() => setReceiptUri(null)}
+                    style={{ padding: 6 }}
+                  >
+                    <MaterialCommunityIcons name="trash-can-outline" size={18} color="#DC2626" />
+                  </TouchableOpacity>
+                )}
+              </View>
+              {receiptUri && (
+                <Image
+                  source={{ uri: receiptUri }}
+                  style={{ width: 90, height: 90, borderRadius: 10, marginTop: 8, borderWidth: 1, borderColor: '#CBD5E1' }}
+                />
+              )}
+            </View>
 
             {/* Save Button */}
             <TouchableOpacity

@@ -25,6 +25,7 @@ import { RolloverModal } from '../components/RolloverModal';
 import { ExcelSheetEntryModal } from '../components/ExcelSheetEntryModal';
 import { VoiceQueryModal } from '../components/VoiceQueryModal';
 import { ManageCategoriesModal } from '../components/ManageCategoriesModal';
+import { SmartFeaturesModal } from '../components/SmartFeaturesModal';
 
 export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
   const {
@@ -37,6 +38,8 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
     toggleLanguage,
     isDarkMode,
     toggleDarkMode,
+    isBalancesHidden,
+    toggleHideBalances,
     themeColors,
     alertPrefs,
     updateAlertPrefs,
@@ -55,6 +58,8 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
   const [dueReminderVisible, setDueReminderVisible] = useState(false);
   const [voiceQueryVisible, setVoiceQueryVisible] = useState(false);
   const [manageCategoriesVisible, setManageCategoriesVisible] = useState(false);
+  const [smartModalVisible, setSmartModalVisible] = useState(false);
+  const [smartModalTab, setSmartModalTab] = useState('recurring');
   const hasShownStartupAlert = useRef(false);
 
   // Show startup Credit Card due-date reminder modal once data is loaded (only if startupAlertEnabled is true)
@@ -134,6 +139,22 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
             </View>
 
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {/* Privacy Hide/Show Balances Eye Toggle */}
+              <TouchableOpacity
+                style={[
+                  styles.settingsHeaderBtn,
+                  { backgroundColor: isDarkMode ? themeColors.surfaceSecondary : '#F1F5F9', borderColor: isDarkMode ? themeColors.border : '#E2E8F0' },
+                ]}
+                onPress={toggleHideBalances}
+                activeOpacity={0.7}
+              >
+                <MaterialCommunityIcons
+                  name={isBalancesHidden ? 'eye-off-outline' : 'eye-outline'}
+                  size={20}
+                  color={isBalancesHidden ? '#EF4444' : (isDarkMode ? '#34D399' : themeColors.primaryDark)}
+                />
+              </TouchableOpacity>
+
               {/* Dark Mode Quick Toggle */}
               <TouchableOpacity
                 style={[
@@ -176,6 +197,69 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
             style={styles.actionTabsScroll}
           >
             {/* Manage & Delete Categories Button */}
+            <TouchableOpacity
+              style={[
+                styles.syncBtn,
+                {
+                  backgroundColor: isDarkMode ? themeColors.primaryLight : '#ECFDF5',
+                  borderColor: isDarkMode ? '#2D6A56' : '#6EE7B7',
+                  paddingHorizontal: 9,
+                },
+              ]}
+              onPress={() => {
+                setSmartModalTab('recurring');
+                setSmartModalVisible(true);
+              }}
+              activeOpacity={0.7}
+            >
+              <MaterialCommunityIcons name="calendar-refresh-outline" size={15} color={themeColors.primaryDark} />
+              <Text style={[styles.syncBtnText, { color: themeColors.primaryDark, fontWeight: '800' }]}>
+                {isArabic ? 'فواتير متكررة 📅' : 'Recurring 📅'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.syncBtn,
+                {
+                  backgroundColor: isDarkMode ? '#3A301F' : '#FFFBEB',
+                  borderColor: '#FDE68A',
+                  paddingHorizontal: 9,
+                },
+              ]}
+              onPress={() => {
+                setSmartModalTab('savings');
+                setSmartModalVisible(true);
+              }}
+              activeOpacity={0.7}
+            >
+              <MaterialCommunityIcons name="piggy-bank-outline" size={15} color="#D97706" />
+              <Text style={[styles.syncBtnText, { color: '#D97706', fontWeight: '800' }]}>
+                {isArabic ? 'أهداف الادخار 🎯' : 'Savings 🎯'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.syncBtn,
+                {
+                  backgroundColor: isDarkMode ? '#233044' : '#EFF6FF',
+                  borderColor: '#93C5FD',
+                  paddingHorizontal: 9,
+                },
+              ]}
+              onPress={() => {
+                setSmartModalTab('themes');
+                setSmartModalVisible(true);
+              }}
+              activeOpacity={0.7}
+            >
+              <MaterialCommunityIcons name="palette-outline" size={15} color="#2563EB" />
+              <Text style={[styles.syncBtnText, { color: '#2563EB', fontWeight: '800' }]}>
+                {isArabic ? 'الثيم والقفل 🔒' : 'Theme & Lock 🔒'}
+              </Text>
+            </TouchableOpacity>
+
             <TouchableOpacity
               style={[
                 styles.syncBtn,
@@ -375,7 +459,7 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
                   <View style={styles.startItem}>
                     <Text style={[styles.startItemVal, isDarkMode && { color: themeColors.textPrimary }]}>{formatAmount(balances.startCsh)} {currency.symbol}</Text>
                     <Text style={[styles.startItemLbl, isDarkMode && { color: themeColors.textSecondary }]}>
-                      {isArabic ? 'كاش متاح (بداية)' : 'Available Cash (Start)'}
+                      {isArabic ? 'كاش (بداية)' : 'Cash (Start)'}
                     </Text>
                   </View>
 
@@ -719,6 +803,11 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
           visible={voiceQueryVisible}
           onClose={() => setVoiceQueryVisible(false)}
           onOpenAddExpense={openAddExpense}
+        />
+        <SmartFeaturesModal
+          visible={smartModalVisible}
+          onClose={() => setSmartModalVisible(false)}
+          initialTab={smartModalTab}
         />
       </View>
     </SafeAreaView>

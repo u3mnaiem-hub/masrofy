@@ -231,7 +231,7 @@ export const SetBudgetModal = ({ visible, onClose }) => {
             <View style={[styles.rowInputs, isArabic && { flexDirection: 'row-reverse' }]}>
               <View style={styles.halfInputBox}>
                 <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>
-                  {isArabic ? 'كاش متاح (Available Cash)' : 'Available Cash'}
+                  {isArabic ? 'كاش (Cash)' : 'Cash'}
                 </Text>
                 <View style={styles.inputWrap}>
                   <TextInput

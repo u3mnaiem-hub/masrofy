@@ -1,11 +1,12 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Modal, Image } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS } from '../constants/theme';
 import { getCategoryById, getPaymentMethodById } from '../constants/categories';
 import { useExpense, getGracePeriodStats } from '../context/ExpenseContext';
 
 export const TransactionItem = ({ item, onEdit }) => {
+  const [receiptPreviewVisible, setReceiptPreviewVisible] = useState(false);
   const {
     deleteTransaction,
     currency,
@@ -42,7 +43,7 @@ export const TransactionItem = ({ item, onEdit }) => {
     const toName = toAcc
       ? toAcc.displayShort
       : item.toAccount === 'csh'
-      ? (isArabic ? 'كاش متاح' : 'Cash')
+      ? (isArabic ? 'كاش' : 'Cash')
       : (isArabic ? 'DC / بنك' : 'DC Bank');
     paymentLabel = `${payment?.displayShort || paymentLabel} ➡️ ${toName}`;
   }
@@ -182,6 +183,29 @@ export const TransactionItem = ({ item, onEdit }) => {
           </Text>
         )}
 
+        {item.receiptUri && (
+          <TouchableOpacity
+            onPress={() => setReceiptPreviewVisible(true)}
+            style={{
+              flexDirection: isArabic ? 'row-reverse' : 'row',
+              alignItems: 'center',
+              gap: 4,
+              marginTop: 4,
+              paddingHorizontal: 8,
+              paddingVertical: 3,
+              borderRadius: 6,
+              backgroundColor: '#ECFDF5',
+              borderWidth: 1,
+              borderColor: '#6EE7B7',
+            }}
+          >
+            <MaterialCommunityIcons name="receipt" size={12} color="#059669" />
+            <Text style={{ fontSize: 10, fontWeight: '800', color: '#059669' }}>
+              {isArabic ? 'عرض صورة الفاتورة 🧾' : 'View Receipt 🧾'}
+            </Text>
+          </TouchableOpacity>
+        )}
+
         {isCcPurchase && (
           <View style={[styles.settleActionRow, isArabic && { flexDirection: 'row-reverse' }]}>
             {item.isPaid ? (
@@ -247,6 +271,24 @@ export const TransactionItem = ({ item, onEdit }) => {
           </TouchableOpacity>
         </View>
       </View>
+
+      {item.receiptUri && (
+        <Modal visible={receiptPreviewVisible} transparent animationType="fade" onRequestClose={() => setReceiptPreviewVisible(false)}>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+            <TouchableOpacity
+              onPress={() => setReceiptPreviewVisible(false)}
+              style={{ position: 'absolute', top: 45, right: 20, backgroundColor: '#FFFFFF', borderRadius: 20, padding: 6 }}
+            >
+              <MaterialCommunityIcons name="close" size={24} color="#0F172A" />
+            </TouchableOpacity>
+            <Image
+              source={{ uri: item.receiptUri }}
+              style={{ width: '95%', height: '75%', borderRadius: 16 }}
+              resizeMode="contain"
+            />
+          </View>
+        </Modal>
+      )}
     </View>
   );
 };
