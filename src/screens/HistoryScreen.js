@@ -26,6 +26,9 @@ export const HistoryScreen = () => {
     formatAmount,
     language,
     isArabic,
+    getCategory,
+    allExpenseCategories,
+    allPaymentMethods,
     isCreditCardMethod,
     getAccountById,
     archivedMonths,
@@ -64,7 +67,7 @@ export const HistoryScreen = () => {
 
       if (searchQuery.trim()) {
         const query = searchQuery.trim().toLowerCase();
-        const category = getCategoryById(t.categoryId, language);
+        const category = getCategory ? getCategory(t.categoryId) : getCategoryById(t.categoryId, language);
         const payment = getAccountById ? getAccountById(t.paymentMethod) : getPaymentMethodById(t.paymentMethod, language);
         const matchNote = (t.note || '').toLowerCase().includes(query);
         const matchCategory = (category.displayName || '').toLowerCase().includes(query);
@@ -427,6 +430,8 @@ export const HistoryScreen = () => {
                           balances: selectedArchive.balancesSummary || {},
                           currencySymbol: currency.symbol,
                           isArabic,
+                          allExpenseCategories,
+                          allPaymentMethods,
                         }),
                     },
                     {
@@ -437,6 +442,8 @@ export const HistoryScreen = () => {
                           balances: selectedArchive.balancesSummary || {},
                           currencySymbol: currency.symbol,
                           isArabic,
+                          allExpenseCategories,
+                          allPaymentMethods,
                         }),
                     },
                   ]

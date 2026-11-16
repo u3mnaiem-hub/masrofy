@@ -23,7 +23,30 @@ export const generateAllRecordsExcelBase64 = ({
   balances = {},
   currencySymbol = 'ج.م',
   isArabic = true,
+  allExpenseCategories = [],
+  allPaymentMethods = [],
 }) => {
+  const resolveCatName = (catId) => {
+    const customFound = (allExpenseCategories || []).find((c) => c.id === catId);
+    if (customFound) {
+      return isArabic ? (customFound.nameAr || customFound.name) : (customFound.name || customFound.nameAr);
+    }
+    const cat = getCategoryById(catId, isArabic ? 'ar' : 'en');
+    return cat?.displayName || catId || 'عام';
+  };
+
+  const resolvePmName = (pmId) => {
+    const customPm = (allPaymentMethods || []).find((p) => p.id === pmId);
+    if (customPm) {
+      return isArabic ? (customPm.nameAr || customPm.name) : (customPm.name || customPm.nameAr);
+    }
+    if (pmId === 'csh') return 'كاش';
+    if (pmId === 'dc') return 'DC / حساب بنكي';
+    if (pmId === 'cc_ar') return 'البنك العربي (CC AR)';
+    if (pmId === 'cc_ca') return 'كريدي أجريكول (CC CA)';
+    return pmId || '';
+  };
+
   const wb = XLSX.utils.book_new();
 
   // ==================== SHEET 1: ALL TRANSACTIONS (كافة المعاملات) ====================
@@ -50,15 +73,9 @@ export const generateAllRecordsExcelBase64 = ({
     : 'الشهر الحالي';
 
   (transactions || []).forEach((t) => {
-    const cat = getCategoryById(t.categoryId, 'ar');
-    const catName = cat?.displayName || t.categoryId || 'عام';
+    const catName = resolveCatName(t.categoryId);
     const amt = parseFloat(t.amount) || 0;
-
-    let pmName = t.paymentMethod || '';
-    if (t.paymentMethod === 'csh') pmName = 'كاش';
-    else if (t.paymentMethod === 'dc') pmName = 'DC / حساب بنكي';
-    else if (t.paymentMethod === 'cc_ar') pmName = 'البنك العربي (CC AR)';
-    else if (t.paymentMethod === 'cc_ca') pmName = 'كريدي أجريكول (CC CA)';
+    const pmName = resolvePmName(t.paymentMethod);
 
     let typeStr = 'مصروف';
     if (t.type === 'income') typeStr = 'وارد / إيداع';
@@ -85,15 +102,9 @@ export const generateAllRecordsExcelBase64 = ({
   (archivedMonths || []).forEach((arch) => {
     const archCycleStr = `${arch.cycleStartDate || ''} إلى ${arch.cycleEndDate || ''} (مؤرشف)`;
     (arch.transactions || []).forEach((t) => {
-      const cat = getCategoryById(t.categoryId, 'ar');
-      const catName = cat?.displayName || t.categoryId || 'عام';
+      const catName = resolveCatName(t.categoryId);
       const amt = parseFloat(t.amount) || 0;
-
-      let pmName = t.paymentMethod || '';
-      if (t.paymentMethod === 'csh') pmName = 'كاش';
-      else if (t.paymentMethod === 'dc') pmName = 'DC / حساب بنكي';
-      else if (t.paymentMethod === 'cc_ar') pmName = 'البنك العربي (CC AR)';
-      else if (t.paymentMethod === 'cc_ca') pmName = 'كريدي أجريكول (CC CA)';
+      const pmName = resolvePmName(t.paymentMethod);
 
       let typeStr = 'مصروف';
       if (t.type === 'income') typeStr = 'وارد / إيداع';
@@ -190,6 +201,8 @@ export const saveExcelToChosenFolder = async ({
   balances = {},
   currencySymbol = 'ج.م',
   isArabic = true,
+  allExpenseCategories = [],
+  allPaymentMethods = [],
 }) => {
   const fileName = buildExcelFileName();
   const b64 = generateAllRecordsExcelBase64({
@@ -198,16 +211,18 @@ export const saveExcelToChosenFolder = async ({
     balances,
     currencySymbol,
     isArabic,
+    allExpenseCategories,
+    allPaymentMethods,
   });
 
   if (Platform.OS !== 'android') {
-    return shareExcelFile({ transactions, archivedMonths, balances, currencySymbol, isArabic });
+    return shareExcelFile({ transactions, archivedMonths, balances, currencySymbol, isArabic, allExpenseCategories, allPaymentMethods });
   }
 
   try {
     const SAF = FileSystem.StorageAccessFramework;
     if (!SAF || !SAF.requestDirectoryPermissionsAsync) {
-      return shareExcelFile({ transactions, archivedMonths, balances, currencySymbol, isArabic });
+      return shareExcelFile({ transactions, archivedMonths, balances, currencySymbol, isArabic, allExpenseCategories, allPaymentMethods });
     }
 
     const perm = await SAF.requestDirectoryPermissionsAsync();
@@ -242,6 +257,8 @@ export const shareExcelFile = async ({
   balances = {},
   currencySymbol = 'ج.م',
   isArabic = true,
+  allExpenseCategories = [],
+  allPaymentMethods = [],
 }) => {
   const fileName = buildExcelFileName();
   const b64 = generateAllRecordsExcelBase64({
@@ -250,6 +267,8 @@ export const shareExcelFile = async ({
     balances,
     currencySymbol,
     isArabic,
+    allExpenseCategories,
+    allPaymentMethods,
   });
 
   try {

@@ -29,3 +29,19 @@ export const authenticateWithBiometrics = async (isArabic = true) => {
     return false;
   }
 };
+
+export const authenticateWithDeviceCredential = async (isArabic = true) => {
+  if (Platform.OS !== 'android' || !VoiceInputNative || typeof VoiceInputNative.authenticateDeviceCredential !== 'function') {
+    return false;
+  }
+  try {
+    const title = isArabic ? 'الدخول بالرقم السري - مصروفي 🔑' : 'PIN / Password Login - Masrofy 🔑';
+    const subtitle = isArabic
+      ? 'أدخل الرقم السري أو النمط الخاص بهاتفك لفتح مصروفي'
+      : 'Enter your device PIN, pattern, or password to unlock Masrofy';
+    const res = await VoiceInputNative.authenticateDeviceCredential(title, subtitle);
+    return Boolean(res);
+  } catch {
+    return false;
+  }
+};

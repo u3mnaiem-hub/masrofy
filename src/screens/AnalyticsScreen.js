@@ -13,6 +13,7 @@ export const AnalyticsScreen = () => {
     balances,
     currency,
     formatAmount,
+    allPaymentMethods,
   } = useExpense();
 
   const topCategory = categoryBreakdown.length > 0 ? categoryBreakdown[0] : null;
@@ -49,14 +50,15 @@ export const AnalyticsScreen = () => {
 
   // Payment method distribution
   const paymentBreakdown = useMemo(() => {
-    return PAYMENT_METHODS.map((pm) => {
+    const methods = allPaymentMethods && allPaymentMethods.length > 0 ? allPaymentMethods : PAYMENT_METHODS;
+    return methods.map((pm) => {
       const sum = monthTransactions
         .filter((t) => t.type === 'expense' && t.paymentMethod === pm.id && t.categoryId !== 'switch' && t.categoryId !== 'cc_pyd')
         .reduce((acc, t) => acc + (parseFloat(t.amount) || 0), 0);
       const percent = balances.realTotalSpent > 0 ? (sum / balances.realTotalSpent) * 100 : 0;
       return { ...pm, sum, percent };
     }).filter((pm) => pm.sum > 0);
-  }, [monthTransactions, balances.realTotalSpent]);
+  }, [monthTransactions, balances.realTotalSpent, allPaymentMethods]);
 
   return (
     <SafeAreaView style={styles.safeArea}>

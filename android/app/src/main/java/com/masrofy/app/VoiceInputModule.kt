@@ -1,30 +1,73 @@
 package com.masrofy.app
 
+import android.app.Activity
 import android.app.KeyguardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.hardware.biometrics.BiometricManager
 import android.hardware.biometrics.BiometricPrompt
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.CancellationSignal
+import android.provider.MediaStore
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import androidx.core.content.FileProvider
+import com.facebook.react.bridge.ActivityEventListener
 import com.facebook.react.bridge.Arguments
+import com.facebook.react.bridge.BaseActivityEventListener
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.UiThreadUtil
 import com.facebook.react.modules.core.DeviceEventManagerModule
+import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 
 class VoiceInputModule(private val reactContext: ReactApplicationContext) :
     ReactContextBaseJavaModule(reactContext) {
 
     private var speechRecognizer: SpeechRecognizer? = null
+    private var cameraPromise: Promise? = null
+    private var pendingPhotoFile: File? = null
+
+    companion object {
+        private const val REQUEST_CAMERA_CAPTURE = 4109
+        private const val REQUEST_DEVICE_CREDENTIAL = 4110
+    }
+
+    private var credentialPromise: Promise? = null
+
+    private val activityEventListener: ActivityEventListener = object : BaseActivityEventListener() {
+        override fun onActivityResult(activity: Activity, requestCode: Int, resultCode: Int, data: Intent?) {
+            if (requestCode == REQUEST_CAMERA_CAPTURE) {
+                val promise = cameraPromise
+                val file = pendingPhotoFile
+                cameraPromise = null
+                pendingPhotoFile = null
+                if (promise != null) {
+                    if (resultCode == Activity.RESULT_OK && file != null && file.exists() && file.length() > 0) {
+                        promise.resolve(Uri.fromFile(file).toString())
+                    } else {
+                        try { file?.delete() } catch (_: Exception) {}
+                        promise.resolve(null)
+                    }
+                }
+            } else if (requestCode == REQUEST_DEVICE_CREDENTIAL) {
+                val promise = credentialPromise
+                credentialPromise = null
+                promise?.resolve(resultCode == Activity.RESULT_OK)
+            }
+        }
+    }
+
+    init {
+        reactContext.addActivityEventListener(activityEventListener)
+    }
 
     override fun getName(): String = "VoiceInputModule"
 
@@ -225,9 +268,21 @@ class VoiceInputModule(private val reactContext: ReactApplicationContext) :
                     val builder = BiometricPrompt.Builder(activity)
                         .setTitle(promptTitle)
                         .setSubtitle(promptSub)
-                        .setNegativeButton(negText, executor) { _, _ ->
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        builder.setAllowedAuthenticators(
+                            BiometricManager.Authenticators.BIOMETRIC_WEAK or
+                                BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                                BiometricManager.Authenticators.DEVICE_CREDENTIAL
+                        )
+                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        @Suppress("DEPRECATION")
+                        builder.setDeviceCredentialAllowed(true)
+                    } else {
+                        builder.setNegativeButton(negText, executor) { _, _ ->
                             resolveOnce(false)
                         }
+                    }
 
                     val prompt = builder.build()
                     prompt.authenticate(
@@ -250,6 +305,66 @@ class VoiceInputModule(private val reactContext: ReactApplicationContext) :
                 }
             } catch (e: Exception) {
                 resolveOnce(false)
+            }
+        }
+    }
+
+    @ReactMethod
+    fun authenticateDeviceCredential(title: String, subtitle: String, promise: Promise) {
+        UiThreadUtil.runOnUiThread {
+            try {
+                val activity = reactContext.currentActivity
+                if (activity == null) {
+                    promise.resolve(false)
+                    return@runOnUiThread
+                }
+                val keyguard = reactContext.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+                if (keyguard == null || !keyguard.isDeviceSecure) {
+                    promise.resolve(false)
+                    return@runOnUiThread
+                }
+                @Suppress("DEPRECATION")
+                val intent = keyguard.createConfirmDeviceCredentialIntent(
+                    if (title.isNotBlank()) title else "الرقم السري - مصروفي",
+                    if (subtitle.isNotBlank()) subtitle else "أدخل رمز الهاتف لفتح تطبيق مصروفي"
+                )
+                if (intent == null) {
+                    promise.resolve(false)
+                    return@runOnUiThread
+                }
+                credentialPromise = promise
+                activity.startActivityForResult(intent, REQUEST_DEVICE_CREDENTIAL)
+            } catch (e: Exception) {
+                credentialPromise = null
+                promise.resolve(false)
+            }
+        }
+    }
+
+    @ReactMethod
+    fun openCamera(promise: Promise) {
+        UiThreadUtil.runOnUiThread {
+            try {
+                val activity = reactContext.currentActivity
+                if (activity == null) {
+                    promise.reject("NO_ACTIVITY", "No active activity")
+                    return@runOnUiThread
+                }
+                val photoFile = File(reactContext.filesDir, "receipt_${System.currentTimeMillis()}.jpg")
+                val authority = "${reactContext.packageName}.fileprovider"
+                val photoUri = FileProvider.getUriForFile(reactContext, authority, photoFile)
+
+                val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
+                    putExtra(MediaStore.EXTRA_OUTPUT, photoUri)
+                    addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                cameraPromise = promise
+                pendingPhotoFile = photoFile
+                activity.startActivityForResult(intent, REQUEST_CAMERA_CAPTURE)
+            } catch (e: Exception) {
+                cameraPromise = null
+                pendingPhotoFile = null
+                promise.reject("CAMERA_ERROR", e.message ?: "Failed to open camera")
             }
         }
     }

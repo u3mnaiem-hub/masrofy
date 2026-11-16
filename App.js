@@ -33,6 +33,7 @@ function MainApp() {
     isAppUnlocked,
     unlockAppWithPin,
     unlockAppWithBiometrics,
+    unlockAppWithDeviceCredential,
   } = useExpense();
   const insets = useSafeAreaInsets();
 
@@ -144,7 +145,30 @@ function MainApp() {
               ))}
             </View>
           </>
-        ) : null}
+        ) : (
+          <TouchableOpacity
+            onPress={() => unlockAppWithDeviceCredential && unlockAppWithDeviceCredential()}
+            activeOpacity={0.85}
+            style={{
+              flexDirection: isArabic ? 'row-reverse' : 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              backgroundColor: '#1E293B',
+              paddingVertical: 12,
+              paddingHorizontal: 22,
+              borderRadius: 14,
+              marginTop: 4,
+              borderWidth: 1.5,
+              borderColor: '#475569',
+            }}
+          >
+            <MaterialCommunityIcons name="dialpad" size={22} color="#E2E8F0" />
+            <Text style={{ color: '#E2E8F0', fontSize: 14, fontWeight: '800' }}>
+              {isArabic ? 'الدخول بالرقم السري / قفل الهاتف 🔑' : 'Unlock with Device PIN / Password 🔑'}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   }

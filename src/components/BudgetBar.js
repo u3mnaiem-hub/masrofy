@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { COLORS } from '../constants/theme';
+import { COLORS, SHADOWS } from '../constants/theme';
 import { useExpense } from '../context/ExpenseContext';
 
 export const BudgetBar = () => {
@@ -41,7 +41,7 @@ export const BudgetBar = () => {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, SHADOWS.small]}>
       <View style={styles.headerRow}>
         <Text style={styles.title}>الميزانية الشهرية المقررة</Text>
         <Text style={styles.budgetValue}>

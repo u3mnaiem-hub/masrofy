@@ -11,6 +11,7 @@ import {
   Platform,
   Alert,
   Image,
+  NativeModules,
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
@@ -83,6 +84,28 @@ export const AddTransactionModal = ({
         }
       }
     } catch {}
+  };
+
+  const handleCaptureReceiptPhoto = async () => {
+    try {
+      const nativeMod = NativeModules.VoiceInputModule;
+      if (!nativeMod || typeof nativeMod.openCamera !== 'function') {
+        Alert.alert(
+          isArabic ? 'تنبيه' : 'Alert',
+          isArabic ? 'الكاميرا غير متاحة على هذا الجهاز حالياً' : 'Camera is not available on this device'
+        );
+        return;
+      }
+      const capturedUri = await nativeMod.openCamera();
+      if (capturedUri) {
+        setReceiptUri(capturedUri);
+      }
+    } catch (e) {
+      Alert.alert(
+        isArabic ? 'خطأ في الكاميرا' : 'Camera Error',
+        isArabic ? 'تعذر فتح الكاميرا، يرجى المحاولة مرة أخرى' : 'Could not open camera, please try again'
+      );
+    }
   };
 
   // Voice Assistant & Custom Category States
@@ -1607,9 +1630,9 @@ export const AddTransactionModal = ({
               textAlign={isArabic ? 'right' : 'left'}
             />
 
-            {/* Receipt Image Attachment */}
+            {/* Receipt Image Attachment + Direct Camera Button */}
             <View style={{ marginTop: 10, marginBottom: 6 }}>
-              <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 10 }}>
+              <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                 <TouchableOpacity
                   onPress={handlePickReceiptImage}
                   style={{
@@ -1624,11 +1647,30 @@ export const AddTransactionModal = ({
                     borderColor: '#86EFAC',
                   }}
                 >
-                  <MaterialCommunityIcons name="camera-plus-outline" size={18} color="#059669" />
+                  <MaterialCommunityIcons name="file-image-plus-outline" size={18} color="#059669" />
                   <Text style={{ fontSize: 12, fontWeight: '800', color: '#059669' }}>
                     {receiptUri
-                      ? (isArabic ? 'تغيير صورة الفاتورة 🧾' : 'Change Receipt 🧾')
-                      : (isArabic ? 'إرفاق صورة الفاتورة / الإيصال 📷' : 'Attach Receipt Image 📷')}
+                      ? (isArabic ? 'تغيير الفاتورة 🧾' : 'Change Receipt 🧾')
+                      : (isArabic ? 'إرفاق فاتورة / إيصال' : 'Attach Receipt')}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleCaptureReceiptPhoto}
+                  style={{
+                    flexDirection: isArabic ? 'row-reverse' : 'row',
+                    alignItems: 'center',
+                    gap: 5,
+                    paddingHorizontal: 12,
+                    paddingVertical: 9,
+                    borderRadius: 10,
+                    backgroundColor: '#EFF6FF',
+                    borderWidth: 1,
+                    borderColor: '#93C5FD',
+                  }}
+                >
+                  <MaterialCommunityIcons name="camera-outline" size={18} color="#1D4ED8" />
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#1D4ED8' }}>
+                    {isArabic ? 'كاميرا 📷' : 'Camera 📷'}
                   </Text>
                 </TouchableOpacity>
                 {receiptUri && (

@@ -607,34 +607,47 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
         </View>
       </View>
 
-      {/* 5. Action Buttons: 2 rows of 2 wide buttons for maximum comfort & clarity */}
-      <View style={styles.actionButtonsContainer}>
-        {/* Row 1: تسجيل مصروف + سداد كارت ائتمان */}
-        <View style={[styles.actionButtonsRow, isArabic && { flexDirection: 'row-reverse' }]}>
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.expenseActionBtn, isArabic && { flexDirection: 'row-reverse' }]}
-            onPress={onOpenAddExpense}
-            activeOpacity={0.8}
-          >
-            <MaterialCommunityIcons name="minus-circle-outline" size={15} color={COLORS.textWhite} />
-            <Text style={styles.actionBtnText}>{isArabic ? 'تسجيل مصروف' : 'Add Expense'}</Text>
-          </TouchableOpacity>
+      {/* 5. Action Buttons: Circular Add Expense + Secondary Actions */}
+      <View style={[styles.actionButtonsContainer, isArabic && { flexDirection: 'row-reverse' }]}>
+        {/* Circular Add Expense Button */}
+        <TouchableOpacity
+          style={[styles.circularExpenseBtn, SHADOWS.medium]}
+          onPress={onOpenAddExpense}
+          activeOpacity={0.85}
+        >
+          <MaterialCommunityIcons name="minus-circle-outline" size={24} color={COLORS.textWhite} />
+          <Text style={styles.circularExpenseBtnText} numberOfLines={2}>
+            {isArabic ? 'تسجيل\nمصروف' : 'Add\nExpense'}
+          </Text>
+        </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.payCcActionBtn, { backgroundColor: themeColors.primaryDark }, isArabic && { flexDirection: 'row-reverse' }]}
-            onPress={() => onOpenPayCc && onOpenPayCc('cc_ar')}
-            activeOpacity={0.8}
-          >
-            <MaterialCommunityIcons name="credit-card-check" size={15} color={COLORS.textWhite} />
-            <Text style={styles.actionBtnText}>{isArabic ? 'سداد كارت 💳' : 'Pay Card 💳'}</Text>
-          </TouchableOpacity>
-        </View>
+        {/* Secondary Action Buttons */}
+        <View style={styles.secondaryActionsCol}>
+          <View style={[styles.actionButtonsRow, isArabic && { flexDirection: 'row-reverse' }]}>
+            <TouchableOpacity
+              style={[styles.actionBtn, SHADOWS.small, styles.payCcActionBtn, { backgroundColor: themeColors.primaryDark }, isArabic && { flexDirection: 'row-reverse' }]}
+              onPress={() => onOpenPayCc && onOpenPayCc('cc_ar')}
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons name="credit-card-check" size={15} color={COLORS.textWhite} />
+              <Text style={styles.actionBtnText}>{isArabic ? 'سداد كارت 💳' : 'Pay Card 💳'}</Text>
+            </TouchableOpacity>
 
-        {/* Row 2: شيت إكسيل سريع + وارد / تحويل */}
-        <View style={[styles.actionButtonsRow, { marginTop: 6 }, isArabic && { flexDirection: 'row-reverse' }]}>
+            <TouchableOpacity
+              style={[styles.actionBtn, SHADOWS.small, styles.incomeActionBtn, { backgroundColor: themeColors.primary }, isArabic && { flexDirection: 'row-reverse' }]}
+              onPress={onOpenAddIncome}
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons name="plus-circle-outline" size={15} color={COLORS.textWhite} />
+              <Text style={styles.actionBtnText}>
+                {isArabic ? 'وارد / تحويل' : 'Income / Trns'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           {onOpenExcelSheet && (
             <TouchableOpacity
-              style={[styles.actionBtn, styles.excelActionBtn, { backgroundColor: themeColors.primaryLight, borderColor: themeColors.primary }, isArabic && { flexDirection: 'row-reverse' }]}
+              style={[styles.actionBtn, SHADOWS.small, styles.excelActionBtn, { marginTop: 6, backgroundColor: themeColors.primaryLight, borderColor: themeColors.primary }, isArabic && { flexDirection: 'row-reverse' }]}
               onPress={onOpenExcelSheet}
               activeOpacity={0.8}
             >
@@ -644,17 +657,6 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
               </Text>
             </TouchableOpacity>
           )}
-
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.incomeActionBtn, { backgroundColor: themeColors.primary }, isArabic && { flexDirection: 'row-reverse' }]}
-            onPress={onOpenAddIncome}
-            activeOpacity={0.8}
-          >
-            <MaterialCommunityIcons name="plus-circle-outline" size={15} color={COLORS.textWhite} />
-            <Text style={styles.actionBtnText}>
-              {isArabic ? 'وارد / تحويل' : 'Income / Trns'}
-            </Text>
-          </TouchableOpacity>
         </View>
       </View>
     </View>
@@ -832,6 +834,7 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 12,
     borderWidth: 1,
+    ...SHADOWS.small,
   },
   // Beige theme (كاش متاح + حساب بنكي DC)
   beigeCard: {
@@ -953,6 +956,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderWidth: 1,
     borderColor: '#F1F5F9',
+    ...SHADOWS.small,
   },
   insightItem: {
     flex: 1,
@@ -975,6 +979,31 @@ const styles = StyleSheet.create({
   // Action Buttons
   actionButtonsContainer: {
     width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  circularExpenseBtn: {
+    width: 78,
+    height: 78,
+    borderRadius: 39,
+    backgroundColor: COLORS.expense,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: '#FCA5A5',
+  },
+  circularExpenseBtnText: {
+    color: COLORS.textWhite,
+    fontSize: 10,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginTop: 2,
+    lineHeight: 13,
+  },
+  secondaryActionsCol: {
+    flex: 1,
   },
   actionButtonsRow: {
     flexDirection: 'row',

@@ -22,6 +22,7 @@ export const ExcelSheetEntryModal = ({ visible, onClose }) => {
     currency,
     formatAmount,
     allPaymentMethods,
+    allExpenseCategories,
     addTransactionsBatch,
   } = useExpense();
 
@@ -48,7 +49,10 @@ export const ExcelSheetEntryModal = ({ visible, onClose }) => {
   const [rows, setRows] = useState(generateInitialRows);
   const [isSaving, setIsSaving] = useState(false);
 
-  const categoriesList = EXPENSE_CATEGORIES.map((c) => ({
+  const categoriesList = (allExpenseCategories && allExpenseCategories.length > 0
+    ? allExpenseCategories
+    : EXPENSE_CATEGORIES
+  ).map((c) => ({
     id: c.id,
     label: isArabic ? c.nameAr || c.name : c.name,
     color: c.color,

@@ -12,6 +12,7 @@ import {
 import {
   isBiometricHardwareAvailable,
   authenticateWithBiometrics,
+  authenticateWithDeviceCredential,
 } from '../utils/biometricHelper';
 
 const ExpenseContext = createContext();
@@ -656,7 +657,7 @@ export const ExpenseProvider = ({ children }) => {
         )
         .reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);
       const spentBefore = spentAfter - newTx.amount;
-      const cat = getCategoryById(newTx.categoryId, language);
+      const cat = getCategory(newTx.categoryId);
       if (spentAfter > limit) {
         budgetAlert = {
           level: 'exceeded',
@@ -1502,7 +1503,7 @@ export const ExpenseProvider = ({ children }) => {
           )
           .reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);
         const pct = limit > 0 ? (spent / limit) * 100 : 0;
-        const cat = getCategoryById(catId, language);
+        const cat = getCategory(catId);
         return {
           categoryId: catId,
           category: { ...cat, name: cat.displayName },
@@ -1515,7 +1516,7 @@ export const ExpenseProvider = ({ children }) => {
       })
       .filter((b) => b.limit > 0)
       .sort((a, b) => b.pct - a.pct);
-  }, [categoryBudgets, sortedTransactions, language]);
+  }, [categoryBudgets, sortedTransactions, language, allExpenseCategories]);
 
   // Categories Breakdown
   const categoryBreakdown = useMemo(() => {
@@ -1524,7 +1525,7 @@ export const ExpenseProvider = ({ children }) => {
       if (tx.type === 'switch' || tx.categoryId === 'switch' || tx.type === 'cc_pyd' || tx.categoryId === 'cc_pyd' || tx.type === 'income') {
         return;
       }
-      const cat = getCategoryById(tx.categoryId, language);
+      const cat = getCategory(tx.categoryId);
       if (!map[cat.id]) {
         map[cat.id] = { category: { ...cat, name: cat.displayName }, total: 0, count: 0 };
       }
@@ -1538,7 +1539,7 @@ export const ExpenseProvider = ({ children }) => {
     }));
 
     return list.sort((a, b) => b.total - a.total);
-  }, [sortedTransactions, balances.realTotalSpent, language]);
+  }, [sortedTransactions, balances.realTotalSpent, language, allExpenseCategories]);
 
   const formatAmount = (num, opts) => {
     if (isBalancesHidden && !opts?.ignorePrivacy) {
@@ -1682,6 +1683,15 @@ export const ExpenseProvider = ({ children }) => {
     return false;
   };
 
+  const unlockAppWithDeviceCredential = async () => {
+    const ok = await authenticateWithDeviceCredential(language === 'ar');
+    if (ok) {
+      setIsAppUnlocked(true);
+      return true;
+    }
+    return false;
+  };
+
   const lockAppNow = () => {
     if (appPin || (biometricEnabled && biometricHardwareAvailable)) {
       setIsAppUnlocked(false);
@@ -1787,6 +1797,7 @@ export const ExpenseProvider = ({ children }) => {
         setAutoLockAfterMinute,
         unlockAppWithPin,
         unlockAppWithBiometrics,
+        unlockAppWithDeviceCredential,
         lockAppNow,
         themeColors: getThemeColors(isDarkMode, colorPalette),
         transactions: sortedTransactions,

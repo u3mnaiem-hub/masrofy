@@ -24,7 +24,10 @@ export const CategoryBudgetsModal = ({ visible, onClose }) => {
     currency,
     formatAmount,
     isArabic,
+    allExpenseCategories,
   } = useExpense();
+
+  const categoriesList = allExpenseCategories && allExpenseCategories.length > 0 ? allExpenseCategories : EXPENSE_CATEGORIES;
 
   const [inputs, setInputs] = useState({});
   const [editingCatId, setEditingCatId] = useState(null);
@@ -32,13 +35,13 @@ export const CategoryBudgetsModal = ({ visible, onClose }) => {
   useEffect(() => {
     if (visible) {
       const initInputs = {};
-      EXPENSE_CATEGORIES.forEach((cat) => {
+      categoriesList.forEach((cat) => {
         initInputs[cat.id] = categoryBudgets?.[cat.id] ? String(categoryBudgets[cat.id]) : '';
       });
       setInputs(initInputs);
       setEditingCatId(null);
     }
-  }, [visible, categoryBudgets]);
+  }, [visible, categoryBudgets, categoriesList]);
 
   // Calculate spending per category in current month
   const spentPerCat = {};
@@ -108,7 +111,7 @@ export const CategoryBudgetsModal = ({ visible, onClose }) => {
           </View>
 
           {/* Categories List */}
-          {EXPENSE_CATEGORIES.map((cat) => {
+          {categoriesList.map((cat) => {
             const spent = spentPerCat[cat.id] || 0;
             const limit = parseFloat(categoryBudgets?.[cat.id]) || 0;
             const pct = limit > 0 ? Math.round((spent / limit) * 100) : 0;

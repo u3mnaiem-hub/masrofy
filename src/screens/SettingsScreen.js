@@ -69,6 +69,8 @@ export const SettingsScreen = () => {
     setAutoLockAfterMinute,
     unlockAppWithBiometrics,
     lockAppNow,
+    allExpenseCategories,
+    allPaymentMethods,
   } = useExpense();
 
   const { width: winWidth } = useWindowDimensions();
@@ -280,6 +282,8 @@ export const SettingsScreen = () => {
                 balances,
                 currencySymbol: currency.symbol,
                 isArabic,
+                allExpenseCategories,
+                allPaymentMethods,
               });
               setBackupBusy(false);
               if (res.success) {
@@ -309,6 +313,8 @@ export const SettingsScreen = () => {
                 balances,
                 currencySymbol: currency.symbol,
                 isArabic,
+                allExpenseCategories,
+                allPaymentMethods,
               });
               setBackupBusy(false);
               if (!res.success) {

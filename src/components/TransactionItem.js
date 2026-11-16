@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Modal, Image } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { COLORS } from '../constants/theme';
+import { COLORS, SHADOWS } from '../constants/theme';
 import { getCategoryById, getPaymentMethodById } from '../constants/categories';
 import { useExpense, getGracePeriodStats } from '../context/ExpenseContext';
 
@@ -13,6 +13,7 @@ export const TransactionItem = ({ item, onEdit }) => {
     formatAmount,
     language,
     isArabic,
+    getCategory,
     getAccountById,
     isCreditCardMethod,
     settleCreditCardTransaction,
@@ -20,7 +21,7 @@ export const TransactionItem = ({ item, onEdit }) => {
     isDarkMode,
     themeColors,
   } = useExpense();
-  const category = getCategoryById(item.categoryId, language);
+  const category = getCategory ? getCategory(item.categoryId) : getCategoryById(item.categoryId, language);
   const isIncome = item.type === 'income';
 
   const payment = getAccountById ? getAccountById(item.paymentMethod) : getPaymentMethodById(item.paymentMethod, language);
@@ -151,7 +152,7 @@ export const TransactionItem = ({ item, onEdit }) => {
   const dateTimeText = formattedTime ? `${item.date} • ${formattedTime}` : item.date;
 
   return (
-    <View style={[styles.card, isArabic && { flexDirection: 'row-reverse' }, isDarkMode && { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
+    <View style={[styles.card, SHADOWS.small, isArabic && { flexDirection: 'row-reverse' }, isDarkMode && { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
       {/* Category Icon */}
       <View style={[styles.iconContainer, { backgroundColor: category.bgColor }]}>
         <MaterialCommunityIcons name={category.icon} size={18} color={category.color} />
