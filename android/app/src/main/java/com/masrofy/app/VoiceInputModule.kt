@@ -11,6 +11,8 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.CancellationSignal
+import android.os.Handler
+import android.os.Looper
 import android.provider.MediaStore
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
@@ -35,9 +37,21 @@ class VoiceInputModule(private val reactContext: ReactApplicationContext) :
     private var cameraPromise: Promise? = null
     private var pendingPhotoFile: File? = null
 
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var isSessionActive = false
+    private var sessionId = 0L
+    private var sessionStartTimeMs = 0L
+    private var currentLanguage = "ar-EG"
+    private val accumulatedText = StringBuilder()
+    private var finalizeRunnable: Runnable? = null
+    private var restartRunnable: Runnable? = null
+
     companion object {
         private const val REQUEST_CAMERA_CAPTURE = 4109
         private const val REQUEST_DEVICE_CREDENTIAL = 4110
+        // Generous grace periods so users can speak naturally and pause without getting cut off
+        private const val POST_SPEECH_GRACE_MS = 3500L
+        private const val INITIAL_LISTEN_TIMEOUT_MS = 12000L
     }
 
     private var credentialPromise: Promise? = null
@@ -100,6 +114,214 @@ class VoiceInputModule(private val reactContext: ReactApplicationContext) :
         }
     }
 
+    private fun cancelPendingTimers() {
+        finalizeRunnable?.let { mainHandler.removeCallbacks(it) }
+        finalizeRunnable = null
+        restartRunnable?.let { mainHandler.removeCallbacks(it) }
+        restartRunnable = null
+    }
+
+    private fun scheduleFinalize(activeSessionId: Long, delayMs: Long = POST_SPEECH_GRACE_MS) {
+        finalizeRunnable?.let { mainHandler.removeCallbacks(it) }
+        val runnable = Runnable {
+            if (!isSessionActive || sessionId != activeSessionId) return@Runnable
+            val finalResult = accumulatedText.toString().trim()
+            isSessionActive = false
+            cancelPendingTimers()
+            destroyRecognizer()
+            emitEvent("VoiceInputEnd", Arguments.createMap())
+            if (finalResult.isNotEmpty()) {
+                val map = Arguments.createMap().apply {
+                    putString("text", finalResult)
+                }
+                emitEvent("VoiceInputResult", map)
+            } else {
+                val map = Arguments.createMap().apply {
+                    putInt("code", SpeechRecognizer.ERROR_NO_MATCH)
+                    putString("message", "لم يتم اكتشاف كلمات")
+                }
+                emitEvent("VoiceInputError", map)
+            }
+        }
+        finalizeRunnable = runnable
+        mainHandler.postDelayed(runnable, delayMs)
+    }
+
+    private fun scheduleRestartRecognizer(activeSessionId: Long, delayMs: Long = 180L) {
+        restartRunnable?.let { mainHandler.removeCallbacks(it) }
+        val runnable = Runnable {
+            if (!isSessionActive || sessionId != activeSessionId) return@Runnable
+            startRecognizerAttempt(activeSessionId, currentLanguage, emitReadyEvent = false)
+        }
+        restartRunnable = runnable
+        mainHandler.postDelayed(runnable, delayMs)
+    }
+
+    private fun startRecognizerAttempt(activeSessionId: Long, lang: String, emitReadyEvent: Boolean) {
+        if (!isSessionActive || sessionId != activeSessionId) return
+
+        destroyRecognizer()
+
+        val recognizer = SpeechRecognizer.createSpeechRecognizer(reactContext)
+        speechRecognizer = recognizer
+
+        recognizer.setRecognitionListener(object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) {
+                if (!isSessionActive || sessionId != activeSessionId) return
+                if (emitReadyEvent) {
+                    emitEvent("VoiceInputReady", Arguments.createMap())
+                }
+            }
+
+            override fun onBeginningOfSpeech() {
+                if (!isSessionActive || sessionId != activeSessionId) return
+                // User started speaking again — cancel pending finalize countdown
+                finalizeRunnable?.let { mainHandler.removeCallbacks(it) }
+                finalizeRunnable = null
+            }
+
+            override fun onRmsChanged(rmsdB: Float) {}
+
+            override fun onBufferReceived(buffer: ByteArray?) {}
+
+            override fun onEndOfSpeech() {
+                // Do not emit VoiceInputEnd here; wait for the grace period to finish
+                // so the user can pause comfortably mid-sentence.
+            }
+
+            override fun onError(error: Int) {
+                if (!isSessionActive || sessionId != activeSessionId) return
+
+                val isRecoverableSilenceError =
+                    error == SpeechRecognizer.ERROR_NO_MATCH ||
+                    error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT ||
+                    error == SpeechRecognizer.ERROR_CLIENT ||
+                    error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
+
+                if (isRecoverableSilenceError) {
+                    if (accumulatedText.isNotEmpty()) {
+                        // We already captured some speech; keep listening during the grace window
+                        if (finalizeRunnable == null) {
+                            scheduleFinalize(activeSessionId, POST_SPEECH_GRACE_MS)
+                        }
+                        scheduleRestartRecognizer(activeSessionId, 220L)
+                        return
+                    }
+
+                    val elapsed = System.currentTimeMillis() - sessionStartTimeMs
+                    if (elapsed < INITIAL_LISTEN_TIMEOUT_MS) {
+                        // Give the user more time to start speaking before timing out
+                        scheduleRestartRecognizer(activeSessionId, 280L)
+                        return
+                    }
+                }
+
+                // Fatal error or initial timeout exceeded
+                if (accumulatedText.isNotEmpty()) {
+                    scheduleFinalize(activeSessionId, 50L)
+                    return
+                }
+
+                isSessionActive = false
+                cancelPendingTimers()
+                destroyRecognizer()
+
+                val message = when (error) {
+                    SpeechRecognizer.ERROR_NO_MATCH -> "لم يتم التعرف على كلام واضح، حاول مرة أخرى"
+                    SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "انتهت مهلة الانتظار دون صوت"
+                    SpeechRecognizer.ERROR_AUDIO -> "خطأ في تسجيل الصوت"
+                    SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "يرجى منح صلاحية الميكروفون"
+                    SpeechRecognizer.ERROR_NETWORK -> "خطأ في الشبكة أثناء التعرف الصوتي"
+                    else -> "خطأ في التعرف الصوتي ($error)"
+                }
+                val map = Arguments.createMap().apply {
+                    putInt("code", error)
+                    putString("message", message)
+                }
+                emitEvent("VoiceInputError", map)
+            }
+
+            override fun onResults(results: Bundle?) {
+                if (!isSessionActive || sessionId != activeSessionId) return
+
+                val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                val text = matches?.firstOrNull()?.trim() ?: ""
+                if (text.isNotEmpty()) {
+                    if (accumulatedText.isNotEmpty()) {
+                        accumulatedText.append(' ')
+                    }
+                    accumulatedText.append(text)
+
+                    val partialMap = Arguments.createMap().apply {
+                        putString("text", accumulatedText.toString().trim())
+                    }
+                    emitEvent("VoiceInputPartial", partialMap)
+
+                    // Give the user a generous grace period to continue speaking before finalizing
+                    scheduleFinalize(activeSessionId, POST_SPEECH_GRACE_MS)
+                    scheduleRestartRecognizer(activeSessionId, 180L)
+                } else if (accumulatedText.isNotEmpty()) {
+                    if (finalizeRunnable == null) {
+                        scheduleFinalize(activeSessionId, POST_SPEECH_GRACE_MS)
+                    }
+                    scheduleRestartRecognizer(activeSessionId, 220L)
+                } else {
+                    val elapsed = System.currentTimeMillis() - sessionStartTimeMs
+                    if (elapsed < INITIAL_LISTEN_TIMEOUT_MS) {
+                        scheduleRestartRecognizer(activeSessionId, 250L)
+                    } else {
+                        isSessionActive = false
+                        cancelPendingTimers()
+                        destroyRecognizer()
+                        val map = Arguments.createMap().apply {
+                            putInt("code", SpeechRecognizer.ERROR_NO_MATCH)
+                            putString("message", "لم يتم اكتشاف كلمات")
+                        }
+                        emitEvent("VoiceInputError", map)
+                    }
+                }
+            }
+
+            override fun onPartialResults(partialResults: Bundle?) {
+                if (!isSessionActive || sessionId != activeSessionId) return
+
+                val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                val text = matches?.firstOrNull()?.trim() ?: ""
+                if (text.isNotEmpty()) {
+                    // User is actively speaking — keep session open
+                    finalizeRunnable?.let { mainHandler.removeCallbacks(it) }
+                    finalizeRunnable = null
+
+                    val combined = if (accumulatedText.isNotEmpty()) {
+                        "${accumulatedText.toString().trim()} $text"
+                    } else {
+                        text
+                    }
+                    val map = Arguments.createMap().apply {
+                        putString("text", combined)
+                    }
+                    emitEvent("VoiceInputPartial", map)
+                }
+            }
+
+            override fun onEvent(eventType: Int, params: Bundle?) {}
+        })
+
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, lang)
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+            // Generous silence timeouts so user can speak slowly and pause naturally
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 8000L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 6000L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 10000L)
+        }
+
+        recognizer.startListening(intent)
+    }
+
     @ReactMethod
     fun startListening(languageCode: String, promise: Promise) {
         UiThreadUtil.runOnUiThread {
@@ -109,89 +331,21 @@ class VoiceInputModule(private val reactContext: ReactApplicationContext) :
                     return@runOnUiThread
                 }
 
+                cancelPendingTimers()
                 destroyRecognizer()
 
-                val recognizer = SpeechRecognizer.createSpeechRecognizer(reactContext)
-                speechRecognizer = recognizer
+                sessionId += 1
+                val activeSessionId = sessionId
+                isSessionActive = true
+                sessionStartTimeMs = System.currentTimeMillis()
+                accumulatedText.clear()
+                currentLanguage = if (languageCode.isBlank()) "ar-EG" else languageCode
 
-                recognizer.setRecognitionListener(object : RecognitionListener {
-                    override fun onReadyForSpeech(params: Bundle?) {
-                        emitEvent("VoiceInputReady", Arguments.createMap())
-                    }
-
-                    override fun onBeginningOfSpeech() {}
-
-                    override fun onRmsChanged(rmsdB: Float) {}
-
-                    override fun onBufferReceived(buffer: ByteArray?) {}
-
-                    override fun onEndOfSpeech() {
-                        emitEvent("VoiceInputEnd", Arguments.createMap())
-                    }
-
-                    override fun onError(error: Int) {
-                        val message = when (error) {
-                            SpeechRecognizer.ERROR_NO_MATCH -> "لم يتم التعرف على كلام واضح، حاول مرة أخرى"
-                            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "انتهت مهلة الانتظار دون صوت"
-                            SpeechRecognizer.ERROR_AUDIO -> "خطأ في تسجيل الصوت"
-                            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "يرجى منح صلاحية الميكروفون"
-                            SpeechRecognizer.ERROR_NETWORK -> "خطأ في الشبكة أثناء التعرف الصوتي"
-                            else -> "خطأ في التعرف الصوتي ($error)"
-                        }
-                        val map = Arguments.createMap().apply {
-                            putInt("code", error)
-                            putString("message", message)
-                        }
-                        emitEvent("VoiceInputError", map)
-                    }
-
-                    override fun onResults(results: Bundle?) {
-                        val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                        val text = matches?.firstOrNull()?.trim() ?: ""
-                        if (text.isNotEmpty()) {
-                            val map = Arguments.createMap().apply {
-                                putString("text", text)
-                            }
-                            emitEvent("VoiceInputResult", map)
-                        } else {
-                            val map = Arguments.createMap().apply {
-                                putInt("code", SpeechRecognizer.ERROR_NO_MATCH)
-                                putString("message", "لم يتم اكتشاف كلمات")
-                            }
-                            emitEvent("VoiceInputError", map)
-                        }
-                    }
-
-                    override fun onPartialResults(partialResults: Bundle?) {
-                        val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                        val text = matches?.firstOrNull()?.trim() ?: ""
-                        if (text.isNotEmpty()) {
-                            val map = Arguments.createMap().apply {
-                                putString("text", text)
-                            }
-                            emitEvent("VoiceInputPartial", map)
-                        }
-                    }
-
-                    override fun onEvent(eventType: Int, params: Bundle?) {}
-                })
-
-                val lang = if (languageCode.isBlank()) "ar-EG" else languageCode
-                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
-                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, lang)
-                    putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-                    putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
-                    // Give generous silence timeouts so user has plenty of time to finish speaking
-                    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 4000L)
-                    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 3000L)
-                    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 5000L)
-                }
-
-                recognizer.startListening(intent)
+                startRecognizerAttempt(activeSessionId, currentLanguage, emitReadyEvent = true)
                 promise.resolve(true)
             } catch (e: Exception) {
+                isSessionActive = false
+                cancelPendingTimers()
                 promise.reject("START_ERROR", e.message ?: "Failed to start speech recognition")
             }
         }
@@ -201,6 +355,10 @@ class VoiceInputModule(private val reactContext: ReactApplicationContext) :
     fun stopListening(promise: Promise) {
         UiThreadUtil.runOnUiThread {
             try {
+                isSessionActive = false
+                sessionId += 1
+                cancelPendingTimers()
+                accumulatedText.clear()
                 destroyRecognizer()
                 promise.resolve(true)
             } catch (e: Exception) {
@@ -381,6 +539,11 @@ class VoiceInputModule(private val reactContext: ReactApplicationContext) :
 
     override fun invalidate() {
         super.invalidate()
-        UiThreadUtil.runOnUiThread { destroyRecognizer() }
+        UiThreadUtil.runOnUiThread {
+            isSessionActive = false
+            sessionId += 1
+            cancelPendingTimers()
+            destroyRecognizer()
+        }
     }
 }

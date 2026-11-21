@@ -145,7 +145,7 @@ export const AddTransactionModal = ({
     const unsub = subscribeVoiceEvents({
       onReady: () => {
         setIsListeningVoice(true);
-        setVoiceLiveStatus(isArabic ? '🎙️ أنصت لصوتك الآن...' : '🎙️ Listening...');
+        setVoiceLiveStatus(isArabic ? '🎙️ أنصت لصوتك الآن... تحدث براحتك' : '🎙️ Listening... take your time');
       },
       onPartial: (partialText) => {
         if (partialText) {
@@ -822,7 +822,11 @@ export const AddTransactionModal = ({
             </TouchableOpacity>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollBody}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollBody}
+            keyboardShouldPersistTaps="handled"
+          >
             {/* 4 Mode Tabs */}
             <View style={[styles.modeTabsRow, isArabic && { flexDirection: 'row-reverse' }]}>
               {/* 1. Expense Tab */}

@@ -75,7 +75,76 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
 
   return (
     <View style={[styles.card, SHADOWS.medium, { borderColor: themeColors.primaryLight, borderWidth: 1.5 }, isDarkMode && { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
-      {/* 1. TOP SPOTLIGHT: المبلغ المنصرف (بالأحمر) وجنبه إجمالي البداية (بلون الثيم بنفس الحجم والفونت) */}
+      {/* 1. TOP SPOTLIGHT: صافي الرصيد المتبقي (بعد خصم الكروت) وتحته صافي الرصيد المتواجد (بدون خصم الكروت) وجنبهم النسبة المئوية */}
+      <View
+        style={[
+          styles.netContainer,
+          isDarkMode && { backgroundColor: '#1E293B', borderColor: '#334155' },
+          isArabic ? { flexDirection: 'row-reverse' } : { flexDirection: 'row' },
+        ]}
+      >
+        {/* Right column in Arabic: Both Balances stacked one under the other */}
+        <View style={[styles.netBalancesCol, isArabic ? { alignItems: 'flex-end' } : { alignItems: 'flex-start' }]}>
+          {/* Balance 1: بعد خصم الكروت */}
+          <View style={[styles.balanceBlock, isArabic && { alignItems: 'flex-end' }]}>
+            <Text style={[styles.netLabel, isDarkMode && { color: themeColors.textSecondary }]} numberOfLines={1}>
+              {isArabic ? 'صافي الرصيد المتبقي (بعد CC)' : 'Net Available (After CC)'}
+            </Text>
+            <View style={[styles.balanceValRow, isArabic && { flexDirection: 'row-reverse' }]}>
+              <Text
+                style={[styles.balanceValNumber, isDarkMode && { color: '#34D399' }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit={true}
+                minimumFontScale={0.8}
+              >
+                {formatAmount(balances.netAvailableAfterCards)}
+              </Text>
+              <Text style={[styles.balanceValCurrency, isDarkMode && { color: '#6EE7B7' }]}> {currency.symbol}</Text>
+            </View>
+          </View>
+
+          <View style={[styles.netDividerH, isDarkMode && { backgroundColor: '#334155' }]} />
+
+          {/* Balance 2: بدون خصم الكروت (بنفس الحجم واللون الأخضر الغامق) */}
+          <View style={[styles.balanceBlock, isArabic && { alignItems: 'flex-end' }]}>
+            <Text style={[styles.netGrossLabel, isDarkMode && { color: themeColors.textSecondary }]} numberOfLines={1}>
+              {isArabic ? 'صافي الرصيد المتواجد (No CC)' : 'Gross Available (No CC)'}
+            </Text>
+            <View style={[styles.balanceValRow, isArabic && { flexDirection: 'row-reverse' }]}>
+              <Text
+                style={[styles.balanceGrossValNumber, isDarkMode && { color: '#34D399' }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit={true}
+                minimumFontScale={0.8}
+              >
+                {formatAmount(grossAvailableBeforeCards)}
+              </Text>
+              <Text style={[styles.balanceValCurrency, isDarkMode && { color: '#6EE7B7' }]}> {currency.symbol}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Left side: النسبة المئوية للاستهلاك الشهري (Monthly Consumption %) */}
+        <View
+          style={[
+            styles.consumptionBox,
+            {
+              backgroundColor: isHighConsumption ? '#DC2626' : themeColors.primaryDark,
+              borderColor: isHighConsumption ? '#B91C1C' : themeColors.primary,
+            },
+          ]}
+        >
+          <MaterialCommunityIcons name="chart-pie" size={17} color="#FFFFFF" />
+          <Text style={[styles.consumptionPercentText, { color: '#FFFFFF' }]}>
+            {consumptionPercent}%
+          </Text>
+          <Text style={[styles.consumptionLabelText, { color: '#FFFFFF' }]} numberOfLines={2}>
+            {isArabic ? 'نسبة الاستهلاك\nالشهري' : 'Monthly\nConsumption'}
+          </Text>
+        </View>
+      </View>
+
+      {/* 2. SECTION 2: المبلغ المنصرف (بالأحمر) وجنبه إجمالي البداية (بلون الثيم بنفس الحجم والفونت) */}
       <View style={[styles.spentHeaderContainer, isArabic && { flexDirection: 'row-reverse' }]}>
         {/* المبلغ المنصرف */}
         <View style={[styles.topFigureBlock, isArabic && { alignItems: 'flex-end' }]}>
@@ -126,59 +195,6 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
             {isArabic
               ? `مر ${balances.daysElapsed} يوم • باقي ${balances.daysLeft}`
               : `${balances.daysElapsed}d passed • ${balances.daysLeft}d left`}
-          </Text>
-        </View>
-      </View>
-
-      {/* 2. SECTION 2: صافي الرصيد المتبقي (بعد خصم الكروت) وتحته صافي الرصيد المتواجد (بدون خصم الكروت) وجنبهم ناحية الشمال النسبة المئوية */}
-      <View style={[styles.netContainer, isArabic ? { flexDirection: 'row-reverse' } : { flexDirection: 'row' }]}>
-        {/* Right column in Arabic: Both Balances stacked one under the other */}
-        <View style={[styles.netBalancesCol, isArabic ? { alignItems: 'flex-end' } : { alignItems: 'flex-start' }]}>
-          {/* Balance 1: بعد خصم الكروت */}
-          <View style={[styles.balanceBlock, isArabic && { alignItems: 'flex-end' }]}>
-            <Text style={styles.netLabel} numberOfLines={1}>
-              {isArabic ? 'صافي الرصيد المتبقي (بعد CC)' : 'Net Available (After CC)'}
-            </Text>
-            <View style={[styles.balanceValRow, isArabic && { flexDirection: 'row-reverse' }]}>
-              <Text style={styles.balanceValNumber}>
-                {formatAmount(balances.netAvailableAfterCards)}
-              </Text>
-              <Text style={styles.balanceValCurrency}> {currency.symbol}</Text>
-            </View>
-          </View>
-
-          <View style={styles.netDividerH} />
-
-          {/* Balance 2: بدون خصم الكروت (بنفس الحجم تقريباً) */}
-          <View style={[styles.balanceBlock, isArabic && { alignItems: 'flex-end' }]}>
-            <Text style={styles.netGrossLabel} numberOfLines={1}>
-              {isArabic ? 'صافي الرصيد المتواجد (No CC)' : 'Gross Available (No CC)'}
-            </Text>
-            <View style={[styles.balanceValRow, isArabic && { flexDirection: 'row-reverse' }]}>
-              <Text style={styles.balanceGrossValNumber}>
-                {formatAmount(grossAvailableBeforeCards)}
-              </Text>
-              <Text style={styles.balanceValCurrency}> {currency.symbol}</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Left side: النسبة المئوية للاستهلاك الشهري (Monthly Consumption %) */}
-        <View
-          style={[
-            styles.consumptionBox,
-            {
-              backgroundColor: isHighConsumption ? '#DC2626' : themeColors.primaryDark,
-              borderColor: isHighConsumption ? '#B91C1C' : themeColors.primary,
-            },
-          ]}
-        >
-          <MaterialCommunityIcons name="chart-pie" size={17} color="#FFFFFF" />
-          <Text style={[styles.consumptionPercentText, { color: '#FFFFFF' }]}>
-            {consumptionPercent}%
-          </Text>
-          <Text style={[styles.consumptionLabelText, { color: '#FFFFFF' }]} numberOfLines={2}>
-            {isArabic ? 'نسبة الاستهلاك\nالشهري' : 'Monthly\nConsumption'}
           </Text>
         </View>
       </View>
@@ -738,17 +754,22 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.primaryDark,
   },
-  // Section 2: Two Net Balances + Left Consumption Badge
+  // Section 1 (Top): Two Net Balances (Dark Green, Large) + Left Consumption Badge with prominent shadow
   netContainer: {
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 14,
-    paddingVertical: 9,
-    paddingHorizontal: 11,
-    marginBottom: 11,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    gap: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingVertical: 11,
+    paddingHorizontal: 12,
+    marginBottom: 13,
+    borderWidth: 1.2,
+    borderColor: '#CBD5E1',
+    gap: 10,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.22,
+    shadowRadius: 10,
+    elevation: 8,
   },
   netBalancesCol: {
     flex: 1,
@@ -757,14 +778,14 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   netLabel: {
-    fontSize: 10,
-    color: COLORS.textSecondary,
+    fontSize: 10.5,
+    color: '#065F46',
     fontWeight: '700',
     marginBottom: 1,
   },
   netGrossLabel: {
-    fontSize: 10,
-    color: '#475569',
+    fontSize: 10.5,
+    color: '#065F46',
     fontWeight: '700',
     marginBottom: 1,
   },
@@ -773,19 +794,21 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
   },
   balanceValNumber: {
-    fontSize: 17,
+    fontSize: 22,
     fontWeight: '900',
-    color: '#0F172A',
+    letterSpacing: -0.4,
+    color: '#065F46',
   },
   balanceGrossValNumber: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#334155',
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: -0.4,
+    color: '#065F46',
   },
   balanceValCurrency: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
-    color: COLORS.textSecondary,
+    color: '#047857',
     marginHorizontal: 2,
   },
   netDividerH: {
