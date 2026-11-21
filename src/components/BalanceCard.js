@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, SHADOWS } from '../constants/theme';
 import { useExpense } from '../context/ExpenseContext';
@@ -73,6 +73,38 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
     (balances.availDc || 0) +
     ((balances.customDebitCardsSummary || []).reduce((sum, d) => sum + (d.avail || 0), 0));
 
+  const isLowGrossBalance = grossAvailableBeforeCards < 15000;
+  const blinkAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (!isLowGrossBalance) {
+      blinkAnim.stopAnimation();
+      blinkAnim.setValue(1);
+      return;
+    }
+
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(blinkAnim, {
+          toValue: 0.2,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(blinkAnim, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+
+    return () => {
+      loop.stop();
+      blinkAnim.setValue(1);
+    };
+  }, [isLowGrossBalance, blinkAnim]);
+
   return (
     <View style={[styles.card, SHADOWS.medium, { borderColor: themeColors.primaryLight, borderWidth: 1.5 }, isDarkMode && { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
       {/* 1. TOP SPOTLIGHT: صافي الرصيد المتبقي (بعد خصم الكروت) وتحته صافي الرصيد المتواجد (بدون خصم الكروت) وجنبهم النسبة المئوية */}
@@ -105,22 +137,41 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
 
           <View style={[styles.netDividerH, isDarkMode && { backgroundColor: '#334155' }]} />
 
-          {/* Balance 2: بدون خصم الكروت (بنفس الحجم واللون الأخضر الغامق) */}
+          {/* Balance 2: بدون خصم الكروت (بنفس الحجم واللون الأخضر الغامق - يومض بالأحمر إذا قل عن 15000) */}
           <View style={[styles.balanceBlock, isArabic && { alignItems: 'flex-end' }]}>
             <Text style={[styles.netGrossLabel, isDarkMode && { color: themeColors.textSecondary }]} numberOfLines={1}>
               {isArabic ? 'صافي الرصيد المتواجد (No CC)' : 'Gross Available (No CC)'}
             </Text>
-            <View style={[styles.balanceValRow, isArabic && { flexDirection: 'row-reverse' }]}>
+            <Animated.View
+              style={[
+                styles.balanceValRow,
+                isArabic && { flexDirection: 'row-reverse' },
+                isLowGrossBalance && { opacity: blinkAnim },
+              ]}
+            >
               <Text
-                style={[styles.balanceGrossValNumber, isDarkMode && { color: '#34D399' }]}
+                style={[
+                  styles.balanceGrossValNumber,
+                  isDarkMode && { color: '#34D399' },
+                  isLowGrossBalance && { color: isDarkMode ? '#F87171' : '#DC2626' },
+                ]}
                 numberOfLines={1}
                 adjustsFontSizeToFit={true}
                 minimumFontScale={0.8}
               >
                 {formatAmount(grossAvailableBeforeCards)}
               </Text>
-              <Text style={[styles.balanceValCurrency, isDarkMode && { color: '#6EE7B7' }]}> {currency.symbol}</Text>
-            </View>
+              <Text
+                style={[
+                  styles.balanceValCurrency,
+                  isDarkMode && { color: '#6EE7B7' },
+                  isLowGrossBalance && { color: isDarkMode ? '#FCA5A5' : '#EF4444' },
+                ]}
+              >
+                {' '}
+                {currency.symbol}
+              </Text>
+            </Animated.View>
           </View>
         </View>
 

@@ -56,6 +56,19 @@ export const stopNativeVoiceListening = async () => {
   }
 };
 
+export const finishNativeVoiceListening = async () => {
+  if (!VoiceInputNative) return '';
+  try {
+    if (typeof VoiceInputNative.finishListening === 'function') {
+      return await VoiceInputNative.finishListening();
+    }
+    await VoiceInputNative.stopListening();
+    return '';
+  } catch {
+    return '';
+  }
+};
+
 /**
  * Subscribes to native voice events: onReady, onPartial, onResult, onError, onEnd.
  * Returns an unsubscribe function.

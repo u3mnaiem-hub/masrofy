@@ -50,8 +50,8 @@ class VoiceInputModule(private val reactContext: ReactApplicationContext) :
         private const val REQUEST_CAMERA_CAPTURE = 4109
         private const val REQUEST_DEVICE_CREDENTIAL = 4110
         // Generous grace periods so users can speak naturally and pause without getting cut off
-        private const val POST_SPEECH_GRACE_MS = 3500L
-        private const val INITIAL_LISTEN_TIMEOUT_MS = 12000L
+        private const val POST_SPEECH_GRACE_MS = 5500L
+        private const val INITIAL_LISTEN_TIMEOUT_MS = 15000L
     }
 
     private var credentialPromise: Promise? = null
@@ -347,6 +347,30 @@ class VoiceInputModule(private val reactContext: ReactApplicationContext) :
                 isSessionActive = false
                 cancelPendingTimers()
                 promise.reject("START_ERROR", e.message ?: "Failed to start speech recognition")
+            }
+        }
+    }
+
+    @ReactMethod
+    fun finishListening(promise: Promise) {
+        UiThreadUtil.runOnUiThread {
+            try {
+                val finalResult = accumulatedText.toString().trim()
+                isSessionActive = false
+                sessionId += 1
+                cancelPendingTimers()
+                accumulatedText.clear()
+                destroyRecognizer()
+                emitEvent("VoiceInputEnd", Arguments.createMap())
+                if (finalResult.isNotEmpty()) {
+                    val map = Arguments.createMap().apply {
+                        putString("text", finalResult)
+                    }
+                    emitEvent("VoiceInputResult", map)
+                }
+                promise.resolve(finalResult)
+            } catch (e: Exception) {
+                promise.resolve("")
             }
         }
     }
