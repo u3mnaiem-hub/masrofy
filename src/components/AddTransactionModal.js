@@ -30,7 +30,6 @@ import {
   extractAmountFromText,
   startNativeVoiceListening,
   stopNativeVoiceListening,
-  finishNativeVoiceListening,
   subscribeVoiceEvents,
 } from '../utils/voiceAssistant';
 
@@ -437,26 +436,26 @@ export const AddTransactionModal = ({
       ? (pmObj?.shortNameAr || pmObj?.nameAr || 'كاش')
       : (pmObj?.shortName || pmObj?.name || 'Cash');
 
-    // Fill the form fields for review instead of auto-saving immediately so the user can finish & verify
+    // Requirement 4: Save the record and return to the Home screen's Add Expense button
     if (finalAmt > 0) {
       const speakMsg = isArabic
-        ? `تم تجهيز ${finalAmt} ${currency.symbol} لبند ${catName} عبر ${pmName}. راجع البيانات واضغط حفظ`
-        : `Filled ${finalAmt} ${currency.symbol} for ${catName} via ${pmName}. Review and tap Save`;
-      setVoiceLiveStatus(
-        isArabic
-          ? `✅ تم تعبئة: ${finalAmt} ${currency.symbol} • ${catName} • ${pmName} — اضغط «حفظ» للتأكيد`
-          : `✅ Filled: ${finalAmt} ${currency.symbol} • ${catName} • ${pmName} — Tap Save to confirm`
-      );
+        ? `تم حفظ ${finalAmt} ${currency.symbol} لبند ${catName} عبر ${pmName}`
+        : `Saved ${finalAmt} ${currency.symbol} for ${catName} via ${pmName}`;
       speakText(speakMsg, { language: isArabic ? 'ar' : 'en' });
+
+      await addTransaction({
+        type: mode === 'income' ? 'income' : 'expense',
+        amount: finalAmt,
+        categoryId: nextCatId,
+        note: nextNote || (isArabic ? `تسجيل صوتي: ${catName}` : `Voice entry: ${catName}`),
+        date: date || new Date().toISOString().split('T')[0],
+        paymentMethod: nextPmId,
+      });
+      onClose();
     } else {
       const speakMsg = isArabic
-        ? 'لم يتم التعرف على المبلغ، يرجى ذكر المبلغ أو كتابته ثم الضغط على حفظ'
-        : 'Amount not detected, please mention or type the amount';
-      setVoiceLiveStatus(
-        isArabic
-          ? '⚠️ لم يتم التعرف على المبلغ بعد — يمكنك تعديل الجملة أو كتابة المبلغ'
-          : '⚠️ Amount not detected yet — edit the sentence or enter amount'
-      );
+        ? 'لم يتم التعرف على المبلغ، يرجى ذكر المبلغ وحفظ المصروف'
+        : 'Amount not detected, please mention the amount';
       speakText(speakMsg, { language: isArabic ? 'ar' : 'en' });
     }
   };
@@ -565,14 +564,19 @@ export const AddTransactionModal = ({
       const numAmt = parseFloat(amount);
       if (numAmt > 0) {
         const finalMsg = isArabic
-          ? `تم تجهيز ${numAmt} ${currency.symbol} لبند ${cName} عبر ${pmName}. راجع البيانات واضغط حفظ.`
-          : `Ready! ${numAmt} ${currency.symbol} for ${cName} via ${pmName}. Review and tap Save.`;
-        setVoiceLiveStatus(
-          isArabic
-            ? `✅ تم تعبئة: ${numAmt} ${currency.symbol} • ${cName} • ${pmName} — اضغط «حفظ» للتأكيد`
-            : `✅ Filled: ${numAmt} ${currency.symbol} • ${cName} • ${pmName} — Tap Save to confirm`
-        );
+          ? `تم بنجاح! تم حفظ ${numAmt} ${currency.symbol} لبند ${cName} عبر ${pmName}.`
+          : `Saved! ${numAmt} ${currency.symbol} for ${cName} via ${pmName}.`;
         speakText(finalMsg, { language: isArabic ? 'ar' : 'en' });
+
+        await addTransaction({
+          type: 'expense',
+          amount: numAmt,
+          categoryId: categoryId,
+          note: note || (isArabic ? `تسجيل صوتي: ${cName}` : `Voice entry: ${cName}`),
+          date: date || new Date().toISOString().split('T')[0],
+          paymentMethod: finalPm,
+        });
+        onClose();
       } else {
         const finalMsg = isArabic
           ? `تم تجهيز بند ${cName} وطريقة الدفع ${pmName}.`
@@ -607,14 +611,19 @@ export const AddTransactionModal = ({
       const numAmt = parseFloat(amount);
       if (numAmt > 0) {
         const finalMsg = isArabic
-          ? `تم تجهيز ${numAmt} ${currency.symbol} لبند ${cName} عبر كارت ${pmName}. راجع البيانات واضغط حفظ.`
-          : `Ready! ${numAmt} ${currency.symbol} for ${cName} via ${pmName}. Review and tap Save.`;
-        setVoiceLiveStatus(
-          isArabic
-            ? `✅ تم تعبئة: ${numAmt} ${currency.symbol} • ${cName} • ${pmName} — اضغط «حفظ» للتأكيد`
-            : `✅ Filled: ${numAmt} ${currency.symbol} • ${cName} • ${pmName} — Tap Save to confirm`
-        );
+          ? `تم بنجاح! تم حفظ ${numAmt} ${currency.symbol} لبند ${cName} عبر كارت ${pmName}.`
+          : `Saved! ${numAmt} ${currency.symbol} for ${cName} via ${pmName}.`;
         speakText(finalMsg, { language: isArabic ? 'ar' : 'en' });
+
+        await addTransaction({
+          type: 'expense',
+          amount: numAmt,
+          categoryId: categoryId,
+          note: note || (isArabic ? `تسجيل صوتي: ${cName}` : `Voice entry: ${cName}`),
+          date: date || new Date().toISOString().split('T')[0],
+          paymentMethod: finalPm,
+        });
+        onClose();
       } else {
         const finalMsg = isArabic
           ? `تم اختيار كارت ${pmName}.`
@@ -1081,20 +1090,17 @@ export const AddTransactionModal = ({
                         styles.voiceMicBtn,
                         isListeningVoice && voiceListenTarget === 'oneLine' && styles.voiceMicBtnActive,
                       ]}
-                      onPress={async () => {
+                      onPress={() => {
                         if (isListeningVoice && voiceListenTarget === 'oneLine') {
-                          const finalized = await finishNativeVoiceListening();
+                          stopNativeVoiceListening();
                           setIsListeningVoice(false);
-                          if (!finalized && oneLineSentence.trim()) {
-                            handleExecuteOneLineVoice(oneLineSentence);
-                          }
                         } else {
                           beginListening('oneLine');
                         }
                       }}
                     >
                       <MaterialCommunityIcons
-                        name={isListeningVoice && voiceListenTarget === 'oneLine' ? 'check' : 'microphone'}
+                        name={isListeningVoice && voiceListenTarget === 'oneLine' ? 'microphone-off' : 'microphone'}
                         size={20}
                         color="#FFFFFF"
                       />
@@ -1108,26 +1114,11 @@ export const AddTransactionModal = ({
                       onSubmitEditing={() => handleExecuteOneLineVoice()}
                     />
                     <TouchableOpacity
-                      style={[
-                        styles.voiceNextStepBtn,
-                        isListeningVoice && voiceListenTarget === 'oneLine' && { backgroundColor: '#059669' },
-                      ]}
-                      onPress={async () => {
-                        if (isListeningVoice && voiceListenTarget === 'oneLine') {
-                          const finalized = await finishNativeVoiceListening();
-                          setIsListeningVoice(false);
-                          if (!finalized && oneLineSentence.trim()) {
-                            handleExecuteOneLineVoice(oneLineSentence);
-                          }
-                        } else {
-                          handleExecuteOneLineVoice();
-                        }
-                      }}
+                      style={styles.voiceNextStepBtn}
+                      onPress={() => handleExecuteOneLineVoice()}
                     >
                       <Text style={styles.voiceNextStepBtnText}>
-                        {isListeningVoice && voiceListenTarget === 'oneLine'
-                          ? (isArabic ? 'تم' : 'Done')
-                          : (isArabic ? 'تطبيق' : 'Fill')}
+                        {isArabic ? 'تطبيق' : 'Fill'}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -1181,23 +1172,9 @@ export const AddTransactionModal = ({
                             styles.voiceMicBtn,
                             isListeningVoice && voiceListenTarget === 'wizard' && styles.voiceMicBtnActive,
                           ]}
-                          onPress={async () => {
-                            if (isListeningVoice && voiceListenTarget === 'wizard') {
-                              const finalized = await finishNativeVoiceListening();
-                              setIsListeningVoice(false);
-                              if (!finalized && voiceStepInput.trim()) {
-                                handleAdvanceVoiceStep(voiceStepInput);
-                              }
-                            } else {
-                              beginListening('wizard');
-                            }
-                          }}
+                          onPress={() => beginListening('wizard')}
                         >
-                          <MaterialCommunityIcons
-                            name={isListeningVoice && voiceListenTarget === 'wizard' ? 'check' : 'microphone'}
-                            size={18}
-                            color="#FFFFFF"
-                          />
+                          <MaterialCommunityIcons name="microphone" size={18} color="#FFFFFF" />
                         </TouchableOpacity>
                         <TextInput
                           style={[styles.voiceStepInput, isArabic && { textAlign: 'right' }]}
@@ -1208,26 +1185,11 @@ export const AddTransactionModal = ({
                           onSubmitEditing={() => handleAdvanceVoiceStep()}
                         />
                         <TouchableOpacity
-                          style={[
-                            styles.voiceNextStepBtn,
-                            isListeningVoice && voiceListenTarget === 'wizard' && { backgroundColor: '#059669' },
-                          ]}
-                          onPress={async () => {
-                            if (isListeningVoice && voiceListenTarget === 'wizard') {
-                              const finalized = await finishNativeVoiceListening();
-                              setIsListeningVoice(false);
-                              if (!finalized && voiceStepInput.trim()) {
-                                handleAdvanceVoiceStep(voiceStepInput);
-                              }
-                            } else {
-                              handleAdvanceVoiceStep();
-                            }
-                          }}
+                          style={styles.voiceNextStepBtn}
+                          onPress={() => handleAdvanceVoiceStep()}
                         >
                           <Text style={styles.voiceNextStepBtnText}>
-                            {isListeningVoice && voiceListenTarget === 'wizard'
-                              ? (isArabic ? 'تم' : 'Done')
-                              : (voiceStep >= 3 ? (isArabic ? 'تطبيق' : 'Fill') : (isArabic ? 'التالي' : 'Next'))}
+                            {voiceStep === 3 ? (isArabic ? 'حفظ' : 'Save') : (isArabic ? 'التالي' : 'Next')}
                           </Text>
                         </TouchableOpacity>
                       </View>
