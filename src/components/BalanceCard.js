@@ -66,7 +66,6 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
   const consumptionPercent = ((balances.totalOutflow / totalBase) * 100).toFixed(1);
   const numConsumption = parseFloat(consumptionPercent) || 0;
   const isHighConsumption = numConsumption > 50;
-  const isCriticalConsumption = numConsumption > 75;
 
   // Gross liquid available before credit card debt deductions
   const grossAvailableBeforeCards =
@@ -75,11 +74,10 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
     ((balances.customDebitCardsSummary || []).reduce((sum, d) => sum + (d.avail || 0), 0));
 
   const isLowGrossBalance = grossAvailableBeforeCards < 15000;
-  const shouldBlink = isLowGrossBalance || isCriticalConsumption;
   const blinkAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    if (!shouldBlink) {
+    if (!isLowGrossBalance) {
       blinkAnim.stopAnimation();
       blinkAnim.setValue(1);
       return;
@@ -105,7 +103,7 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
       loop.stop();
       blinkAnim.setValue(1);
     };
-  }, [shouldBlink, blinkAnim]);
+  }, [isLowGrossBalance, blinkAnim]);
 
   return (
     <View style={[styles.card, SHADOWS.medium, { borderColor: themeColors.primaryLight, borderWidth: 1.5 }, isDarkMode && { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
@@ -177,15 +175,14 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
           </View>
         </View>
 
-        {/* Left side: النسبة المئوية للاستهلاك الشهري (Monthly Consumption %) - blinks if > 75% */}
-        <Animated.View
+        {/* Left side: النسبة المئوية للاستهلاك الشهري (Monthly Consumption %) */}
+        <View
           style={[
             styles.consumptionBox,
             {
               backgroundColor: isHighConsumption ? '#DC2626' : themeColors.primaryDark,
               borderColor: isHighConsumption ? '#B91C1C' : themeColors.primary,
             },
-            isCriticalConsumption && { opacity: blinkAnim },
           ]}
         >
           <MaterialCommunityIcons name="chart-pie" size={17} color="#FFFFFF" />
@@ -195,7 +192,7 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
           <Text style={[styles.consumptionLabelText, { color: '#FFFFFF' }]} numberOfLines={2}>
             {isArabic ? 'نسبة الاستهلاك\nالشهري' : 'Monthly\nConsumption'}
           </Text>
-        </Animated.View>
+        </View>
       </View>
 
       {/* 2. SECTION 2: المبلغ المنصرف (بالأحمر) وجنبه إجمالي البداية (بلون الثيم بنفس الحجم والفونت) */}
