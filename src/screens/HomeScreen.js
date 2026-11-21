@@ -60,7 +60,25 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
   const [manageCategoriesVisible, setManageCategoriesVisible] = useState(false);
   const [smartModalVisible, setSmartModalVisible] = useState(false);
   const [smartModalTab, setSmartModalTab] = useState('recurring');
+  const [homeViewTrigger, setHomeViewTrigger] = useState(0);
+  const [voiceSnackbarText, setVoiceSnackbarText] = useState('');
+  const snackbarTimerRef = useRef(null);
   const hasShownStartupAlert = useRef(false);
+
+  const showVoiceSnackbar = (msg) => {
+    if (!msg) return;
+    if (snackbarTimerRef.current) clearTimeout(snackbarTimerRef.current);
+    setVoiceSnackbarText(msg);
+    snackbarTimerRef.current = setTimeout(() => {
+      setVoiceSnackbarText('');
+    }, 4000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (snackbarTimerRef.current) clearTimeout(snackbarTimerRef.current);
+    };
+  }, []);
 
   // Show startup Credit Card due-date reminder modal once data is loaded (only if startupAlertEnabled is true)
   useEffect(() => {
@@ -408,6 +426,7 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
               onOpenAddIncome={openAddIncome}
               onOpenExcelSheet={() => setExcelSheetVisible(true)}
               onOpenPayCc={openPayCc}
+              viewTrigger={homeViewTrigger}
             />
 
               {/* Cycle Starting Capital & New Month Rollover Card */}
@@ -562,11 +581,29 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
           initialType={modalType}
           initialTargetCard={modalTargetCard}
           editingTransaction={editingTransaction}
+          onAutoSaved={(msg) => showVoiceSnackbar(msg)}
           onClose={() => {
             setModalVisible(false);
             setEditingTransaction(null);
+            setHomeViewTrigger((v) => v + 1);
           }}
         />
+
+        {/* Confirmation Snackbar after Smart Voice Auto-Save */}
+        {!!voiceSnackbarText && (
+          <View
+            style={[
+              styles.voiceSnackbar,
+              SHADOWS.medium,
+              isArabic && { flexDirection: 'row-reverse' },
+            ]}
+          >
+            <MaterialCommunityIcons name="check-circle" size={18} color="#34D399" />
+            <Text style={[styles.voiceSnackbarText, isArabic && { textAlign: 'right' }]} numberOfLines={2}>
+              {voiceSnackbarText}
+            </Text>
+          </View>
+        )}
 
         {/* Cycle & Starting Balances Modal */}
         <SetBudgetModal
@@ -1167,5 +1204,27 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12.5,
     fontWeight: '800',
+  },
+  voiceSnackbar: {
+    position: 'absolute',
+    bottom: 18,
+    left: 16,
+    right: 16,
+    backgroundColor: '#0F172A',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: '#34D399',
+    zIndex: 999,
+  },
+  voiceSnackbarText: {
+    color: '#F8FAFC',
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
   },
 });

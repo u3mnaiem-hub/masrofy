@@ -40,8 +40,9 @@ class VoiceInputModule(private val reactContext: ReactApplicationContext) :
     private val mainHandler = Handler(Looper.getMainLooper())
     private var isSessionActive = false
     private var sessionId = 0L
-    private var sessionStartTimeMs = 0L
-    private var currentLanguage = "ar-EG"
+    private var silenceRetryCount = 0
+    private var serverDisconnectRetryCount = 0
+    private var currentLanguage = DEFAULT_LOCALE
     private val accumulatedText = StringBuilder()
     private var finalizeRunnable: Runnable? = null
     private var restartRunnable: Runnable? = null
@@ -49,9 +50,17 @@ class VoiceInputModule(private val reactContext: ReactApplicationContext) :
     companion object {
         private const val REQUEST_CAMERA_CAPTURE = 4109
         private const val REQUEST_DEVICE_CREDENTIAL = 4110
-        // Generous grace periods so users can speak naturally and pause without getting cut off
+
+        // Speech recognition tuning constants (kept in one place)
+        const val DEFAULT_LOCALE = "ar-EG"
+        const val FALLBACK_LOCALE = "ar"
+        const val COMPLETE_SILENCE_LENGTH_MILLIS = 3500L
+        const val POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS = 3000L
+        const val MINIMUM_SPEECH_LENGTH_MILLIS = 5000L
         private const val POST_SPEECH_GRACE_MS = 3500L
-        private const val INITIAL_LISTEN_TIMEOUT_MS = 12000L
+        private const val MAX_SILENCE_RETRIES = 2
+        private const val SERVER_DISCONNECTED_RETRY_DELAY_MS = 600L
+        private const val ERROR_SERVER_DISCONNECTED = 11
     }
 
     private var credentialPromise: Promise? = null
@@ -192,31 +201,39 @@ class VoiceInputModule(private val reactContext: ReactApplicationContext) :
             override fun onError(error: Int) {
                 if (!isSessionActive || sessionId != activeSessionId) return
 
-                val isRecoverableSilenceError =
-                    error == SpeechRecognizer.ERROR_NO_MATCH ||
-                    error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT ||
-                    error == SpeechRecognizer.ERROR_CLIENT ||
-                    error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
-
-                if (isRecoverableSilenceError) {
-                    if (accumulatedText.isNotEmpty()) {
-                        // We already captured some speech; keep listening during the grace window
-                        if (finalizeRunnable == null) {
-                            scheduleFinalize(activeSessionId, POST_SPEECH_GRACE_MS)
-                        }
-                        scheduleRestartRecognizer(activeSessionId, 220L)
-                        return
-                    }
-
-                    val elapsed = System.currentTimeMillis() - sessionStartTimeMs
-                    if (elapsed < INITIAL_LISTEN_TIMEOUT_MS) {
-                        // Give the user more time to start speaking before timing out
-                        scheduleRestartRecognizer(activeSessionId, 280L)
+                // Handle ERROR_SERVER_DISCONNECTED (11): cancel(), destroy(), recreate after ~600ms, retry
+                if (error == ERROR_SERVER_DISCONNECTED) {
+                    if (serverDisconnectRetryCount < MAX_SILENCE_RETRIES) {
+                        serverDisconnectRetryCount += 1
+                        try { speechRecognizer?.cancel() } catch (_: Exception) {}
+                        destroyRecognizer()
+                        scheduleRestartRecognizer(activeSessionId, SERVER_DISCONNECTED_RETRY_DELAY_MS)
                         return
                     }
                 }
 
-                // Fatal error or initial timeout exceeded
+                // Fallback from ar-EG to ar if locale unsupported
+                if (currentLanguage == DEFAULT_LOCALE && error == SpeechRecognizer.ERROR_CLIENT && silenceRetryCount == 0) {
+                    currentLanguage = FALLBACK_LOCALE
+                }
+
+                val isRecoverableSilenceError =
+                    error == SpeechRecognizer.ERROR_NO_MATCH ||
+                    error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT ||
+                    error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
+
+                if (isRecoverableSilenceError) {
+                    if (silenceRetryCount < MAX_SILENCE_RETRIES) {
+                        silenceRetryCount += 1
+                        if (accumulatedText.isNotEmpty() && finalizeRunnable == null) {
+                            scheduleFinalize(activeSessionId, POST_SPEECH_GRACE_MS)
+                        }
+                        scheduleRestartRecognizer(activeSessionId, 260L)
+                        return
+                    }
+                }
+
+                // Retries exhausted or fatal error: keep & emit any text collected so far
                 if (accumulatedText.isNotEmpty()) {
                     scheduleFinalize(activeSessionId, 50L)
                     return
@@ -231,7 +248,9 @@ class VoiceInputModule(private val reactContext: ReactApplicationContext) :
                     SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "انتهت مهلة الانتظار دون صوت"
                     SpeechRecognizer.ERROR_AUDIO -> "خطأ في تسجيل الصوت"
                     SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "يرجى منح صلاحية الميكروفون"
-                    SpeechRecognizer.ERROR_NETWORK -> "خطأ في الشبكة أثناء التعرف الصوتي"
+                    SpeechRecognizer.ERROR_NETWORK,
+                    SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "خطأ في الشبكة أثناء التعرف الصوتي"
+                    ERROR_SERVER_DISCONNECTED -> "انقطع الاتصال بخدمة الصوت، حاول مرة أخرى"
                     else -> "خطأ في التعرف الصوتي ($error)"
                 }
                 val map = Arguments.createMap().apply {
@@ -247,6 +266,7 @@ class VoiceInputModule(private val reactContext: ReactApplicationContext) :
                 val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                 val text = matches?.firstOrNull()?.trim() ?: ""
                 if (text.isNotEmpty()) {
+                    silenceRetryCount = 0
                     if (accumulatedText.isNotEmpty()) {
                         accumulatedText.append(' ')
                     }
@@ -257,18 +277,21 @@ class VoiceInputModule(private val reactContext: ReactApplicationContext) :
                     }
                     emitEvent("VoiceInputPartial", partialMap)
 
-                    // Give the user a generous grace period to continue speaking before finalizing
+                    // Give the user a grace period to continue speaking before finalizing
                     scheduleFinalize(activeSessionId, POST_SPEECH_GRACE_MS)
                     scheduleRestartRecognizer(activeSessionId, 180L)
                 } else if (accumulatedText.isNotEmpty()) {
                     if (finalizeRunnable == null) {
                         scheduleFinalize(activeSessionId, POST_SPEECH_GRACE_MS)
                     }
-                    scheduleRestartRecognizer(activeSessionId, 220L)
+                    if (silenceRetryCount < MAX_SILENCE_RETRIES) {
+                        silenceRetryCount += 1
+                        scheduleRestartRecognizer(activeSessionId, 220L)
+                    }
                 } else {
-                    val elapsed = System.currentTimeMillis() - sessionStartTimeMs
-                    if (elapsed < INITIAL_LISTEN_TIMEOUT_MS) {
-                        scheduleRestartRecognizer(activeSessionId, 250L)
+                    if (silenceRetryCount < MAX_SILENCE_RETRIES) {
+                        silenceRetryCount += 1
+                        scheduleRestartRecognizer(activeSessionId, 260L)
                     } else {
                         isSessionActive = false
                         cancelPendingTimers()
@@ -288,7 +311,8 @@ class VoiceInputModule(private val reactContext: ReactApplicationContext) :
                 val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                 val text = matches?.firstOrNull()?.trim() ?: ""
                 if (text.isNotEmpty()) {
-                    // User is actively speaking — keep session open
+                    // User is actively speaking — keep session open & reset silence retries
+                    silenceRetryCount = 0
                     finalizeRunnable?.let { mainHandler.removeCallbacks(it) }
                     finalizeRunnable = null
 
@@ -311,12 +335,21 @@ class VoiceInputModule(private val reactContext: ReactApplicationContext) :
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, lang)
+            putExtra(RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE, false)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
-            // Generous silence timeouts so user can speak slowly and pause naturally
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 8000L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 6000L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 10000L)
+            putExtra(
+                RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,
+                COMPLETE_SILENCE_LENGTH_MILLIS
+            )
+            putExtra(
+                RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,
+                POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS
+            )
+            putExtra(
+                RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS,
+                MINIMUM_SPEECH_LENGTH_MILLIS
+            )
         }
 
         recognizer.startListening(intent)
@@ -337,9 +370,10 @@ class VoiceInputModule(private val reactContext: ReactApplicationContext) :
                 sessionId += 1
                 val activeSessionId = sessionId
                 isSessionActive = true
-                sessionStartTimeMs = System.currentTimeMillis()
+                silenceRetryCount = 0
+                serverDisconnectRetryCount = 0
                 accumulatedText.clear()
-                currentLanguage = if (languageCode.isBlank()) "ar-EG" else languageCode
+                currentLanguage = if (languageCode.isBlank()) DEFAULT_LOCALE else languageCode
 
                 startRecognizerAttempt(activeSessionId, currentLanguage, emitReadyEvent = true)
                 promise.resolve(true)
@@ -347,6 +381,30 @@ class VoiceInputModule(private val reactContext: ReactApplicationContext) :
                 isSessionActive = false
                 cancelPendingTimers()
                 promise.reject("START_ERROR", e.message ?: "Failed to start speech recognition")
+            }
+        }
+    }
+
+    @ReactMethod
+    fun finishListening(promise: Promise) {
+        UiThreadUtil.runOnUiThread {
+            try {
+                val finalResult = accumulatedText.toString().trim()
+                isSessionActive = false
+                sessionId += 1
+                cancelPendingTimers()
+                accumulatedText.clear()
+                destroyRecognizer()
+                emitEvent("VoiceInputEnd", Arguments.createMap())
+                if (finalResult.isNotEmpty()) {
+                    val map = Arguments.createMap().apply {
+                        putString("text", finalResult)
+                    }
+                    emitEvent("VoiceInputResult", map)
+                }
+                promise.resolve(finalResult)
+            } catch (e: Exception) {
+                promise.resolve("")
             }
         }
     }

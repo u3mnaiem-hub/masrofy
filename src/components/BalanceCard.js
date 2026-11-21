@@ -1,12 +1,30 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  Animated,
+  AccessibilityInfo,
+  AppState,
+} from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, SHADOWS } from '../constants/theme';
 import { useExpense } from '../context/ExpenseContext';
+import {
+  BUDGET_BLINK_THRESHOLD_PERCENT,
+  BUDGET_BLINK_DURATION_MS,
+  shouldBlinkBudgetPercentage,
+  isBudgetPercentageAboveThreshold,
+} from '../utils/smartVoiceFlow';
 
-export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelSheet, onOpenPayCc }) => {
+export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelSheet, onOpenPayCc, viewTrigger = 0 }) => {
   const { balances, currency, formatAmount, isArabic, isDarkMode, themeColors } = useExpense();
   const [showPlasticCards, setShowPlasticCards] = useState(true);
+  const [reduceMotionEnabled, setReduceMotionEnabled] = useState(false);
+  const [foregroundCycle, setForegroundCycle] = useState(0);
+  const blinkAnim = useRef(new Animated.Value(1)).current;
 
   const bankCardsList = [
     {
@@ -66,6 +84,77 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
   const consumptionPercent = ((balances.totalOutflow / totalBase) * 100).toFixed(1);
   const numConsumption = parseFloat(consumptionPercent) || 0;
   const isHighConsumption = numConsumption > 50;
+  const isCriticalConsumption = isBudgetPercentageAboveThreshold(numConsumption); // > BUDGET_BLINK_THRESHOLD_PERCENT (75)
+  const canAnimateBlink = shouldBlinkBudgetPercentage(numConsumption, reduceMotionEnabled);
+
+  // Respect system "remove animations" / reduce motion accessibility setting
+  useEffect(() => {
+    let mounted = true;
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((enabled) => {
+        if (mounted) setReduceMotionEnabled(Boolean(enabled));
+      })
+      .catch(() => {});
+
+    const sub = AccessibilityInfo.addEventListener?.('reduceMotionChanged', (enabled) => {
+      if (mounted) setReduceMotionEnabled(Boolean(enabled));
+    });
+    return () => {
+      mounted = false;
+      sub?.remove?.();
+    };
+  }, []);
+
+  // Re-trigger the 5-second blink when returning to the app / main screen
+  useEffect(() => {
+    const appStateSub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        setForegroundCycle((c) => c + 1);
+      }
+    });
+    return () => appStateSub?.remove?.();
+  }, []);
+
+  // Smooth fade pulse for ~5 seconds (BUDGET_BLINK_DURATION_MS) when > 75%, then settle to static highlighted state
+  useEffect(() => {
+    blinkAnim.stopAnimation();
+    blinkAnim.setValue(1);
+
+    if (!canAnimateBlink) {
+      return;
+    }
+
+    const pulseCycle = Animated.sequence([
+      Animated.timing(blinkAnim, {
+        toValue: 0.35,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(blinkAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+    ]);
+
+    const loop = Animated.loop(pulseCycle);
+    loop.start();
+
+    const stopTimer = setTimeout(() => {
+      loop.stop();
+      Animated.timing(blinkAnim, {
+        toValue: 1,
+        duration: 220,
+        useNativeDriver: true,
+      }).start();
+    }, BUDGET_BLINK_DURATION_MS);
+
+    return () => {
+      clearTimeout(stopTimer);
+      loop.stop();
+      blinkAnim.setValue(1);
+    };
+  }, [canAnimateBlink, foregroundCycle, viewTrigger, blinkAnim]);
 
   // Gross liquid available before credit card debt deductions
   const grossAvailableBeforeCards =
@@ -124,14 +213,16 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
           </View>
         </View>
 
-        {/* Left side: النسبة المئوية للاستهلاك الشهري (Monthly Consumption %) */}
-        <View
+        {/* Left side: النسبة المئوية للاستهلاك الشهري (Monthly Consumption %) - smooth blink for 5s when > 75%, then static highlight */}
+        <Animated.View
           style={[
             styles.consumptionBox,
             {
-              backgroundColor: isHighConsumption ? '#DC2626' : themeColors.primaryDark,
-              borderColor: isHighConsumption ? '#B91C1C' : themeColors.primary,
+              backgroundColor: isCriticalConsumption ? '#B91C1C' : isHighConsumption ? '#DC2626' : themeColors.primaryDark,
+              borderColor: isCriticalConsumption ? '#FCA5A5' : isHighConsumption ? '#B91C1C' : themeColors.primary,
+              borderWidth: isCriticalConsumption ? 2 : 1,
             },
+            isCriticalConsumption && { opacity: blinkAnim },
           ]}
         >
           <MaterialCommunityIcons name="chart-pie" size={17} color="#FFFFFF" />
@@ -141,7 +232,7 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
           <Text style={[styles.consumptionLabelText, { color: '#FFFFFF' }]} numberOfLines={2}>
             {isArabic ? 'نسبة الاستهلاك\nالشهري' : 'Monthly\nConsumption'}
           </Text>
-        </View>
+        </Animated.View>
       </View>
 
       {/* 2. SECTION 2: المبلغ المنصرف (بالأحمر) وجنبه إجمالي البداية (بلون الثيم بنفس الحجم والفونت) */}
