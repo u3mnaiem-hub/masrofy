@@ -8,9 +8,12 @@ import {
   Modal,
   Switch,
   Alert,
+  Image,
   useWindowDimensions,
   DevSettings,
 } from 'react-native';
+
+const GOLD_LOGO_IMAGE = require('../../assets/masrofy-gold-logo.jpg');
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, SHADOWS } from '../constants/theme';
@@ -64,6 +67,46 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
   const [voiceSnackbarText, setVoiceSnackbarText] = useState('');
   const snackbarTimerRef = useRef(null);
   const hasShownStartupAlert = useRef(false);
+
+  // Auto-scrolling top action bar refs & state
+  const isToolbarScrollLocked = alertPrefs?.toolbarScrollLocked === true;
+  const toolbarScrollRef = useRef(null);
+  const toolbarContentWidthRef = useRef(0);
+  const toolbarContainerWidthRef = useRef(0);
+  const toolbarScrollXRef = useRef(0);
+  const toolbarDirectionRef = useRef(1);
+  const toolbarUserDraggingRef = useRef(false);
+  const toolbarResumeTimerRef = useRef(null);
+
+  useEffect(() => {
+    if (isToolbarScrollLocked) {
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      if (toolbarUserDraggingRef.current) return;
+      const maxScroll = Math.max(0, toolbarContentWidthRef.current - toolbarContainerWidthRef.current);
+      if (maxScroll <= 4) return;
+
+      let nextX = toolbarScrollXRef.current + toolbarDirectionRef.current * 1.1;
+      if (nextX >= maxScroll) {
+        nextX = maxScroll;
+        toolbarDirectionRef.current = -1;
+      } else if (nextX <= 0) {
+        nextX = 0;
+        toolbarDirectionRef.current = 1;
+      }
+      toolbarScrollXRef.current = nextX;
+      toolbarScrollRef.current?.scrollTo({ x: nextX, animated: false });
+    }, 35);
+
+    return () => {
+      clearInterval(intervalId);
+      if (toolbarResumeTimerRef.current) {
+        clearTimeout(toolbarResumeTimerRef.current);
+      }
+    };
+  }, [isToolbarScrollLocked]);
 
   const showVoiceSnackbar = (msg) => {
     if (!msg) return;
@@ -144,15 +187,18 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
       <View style={[styles.container, isDarkMode && { backgroundColor: themeColors.background }]}>
         {/* Top App Header Area */}
         <View style={[styles.headerContainer, { borderBottomColor: themeColors.primaryLight, borderBottomWidth: 2 }, isDarkMode && { backgroundColor: themeColors.surface, borderBottomColor: themeColors.border }]}>
-          {/* Top Row: App Logo & Name (مصروفي with U3mXpns underneath) + Settings Button */}
+          {/* Top Row: App Logo & Gold Brand Plaque Image + Settings Buttons */}
           <View style={[styles.brandingRow, isArabic && { flexDirection: 'row-reverse' }]}>
             <View style={[styles.branding, isArabic && { flexDirection: 'row-reverse' }]}>
               <View style={[styles.appLogoCircle, { backgroundColor: themeColors.primary }]}>
                 <MaterialCommunityIcons name="wallet" size={20} color={COLORS.textWhite} />
               </View>
-              <View style={[styles.nameCol, isArabic && { alignItems: 'flex-end' }]}>
-                <Text style={[styles.appNameAr, { color: isDarkMode ? themeColors.primary : themeColors.primaryDark }]}>مصروفي</Text>
-                <Text style={[styles.appNameSub, { color: isDarkMode ? themeColors.textSecondary : themeColors.primary }]}>U3mXpns</Text>
+              <View style={styles.headerGoldLogoWrap}>
+                <Image
+                  source={GOLD_LOGO_IMAGE}
+                  style={styles.headerGoldLogoImg}
+                  resizeMode="cover"
+                />
               </View>
             </View>
 
@@ -204,10 +250,31 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
             </View>
           </View>
 
-          {/* Bottom Row: Navigation & Action Tabs cleanly positioned underneath */}
+          {/* Bottom Row: Navigation & Action Tabs cleanly positioned underneath (slow ping-pong auto-scroll unless locked in Settings) */}
           <ScrollView
+            ref={toolbarScrollRef}
             horizontal
             showsHorizontalScrollIndicator={false}
+            onLayout={(e) => {
+              toolbarContainerWidthRef.current = e.nativeEvent.layout.width;
+            }}
+            onContentSizeChange={(w) => {
+              toolbarContentWidthRef.current = w;
+            }}
+            onScroll={(e) => {
+              toolbarScrollXRef.current = e.nativeEvent.contentOffset.x;
+            }}
+            scrollEventThrottle={16}
+            onScrollBeginDrag={() => {
+              toolbarUserDraggingRef.current = true;
+              if (toolbarResumeTimerRef.current) clearTimeout(toolbarResumeTimerRef.current);
+            }}
+            onScrollEndDrag={() => {
+              if (toolbarResumeTimerRef.current) clearTimeout(toolbarResumeTimerRef.current);
+              toolbarResumeTimerRef.current = setTimeout(() => {
+                toolbarUserDraggingRef.current = false;
+              }, 2500);
+            }}
             contentContainerStyle={[
               styles.actionTabsContent,
               isArabic && { flexDirection: 'row-reverse' },
@@ -860,18 +927,21 @@ const styles = StyleSheet.create({
   nameCol: {
     justifyContent: 'center',
   },
-  appNameAr: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: COLORS.primaryDark,
-    lineHeight: 25,
+  headerGoldLogoWrap: {
+    width: 112,
+    height: 54,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: '#120C02',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.28,
+    shadowRadius: 5,
+    elevation: 5,
   },
-  appNameSub: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: COLORS.primaryDark,
-    lineHeight: 25,
-    letterSpacing: 0.5,
+  headerGoldLogoImg: {
+    width: '100%',
+    height: '100%',
   },
   settingsHeaderBtn: {
     width: 34,

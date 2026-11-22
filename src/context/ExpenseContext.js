@@ -61,6 +61,7 @@ export const INITIAL_ALERT_PREFS = {
   phoneNotificationsEnabled: true,
   budgetAlertsEnabled: true,
   voiceAutoSaveEnabled: true,
+  toolbarScrollLocked: false,
 };
 
 // Rule: Any Credit Card purchase (CC AR, CC CA, or any custom credit card) is due on the 25th of the FOLLOWING calendar month.

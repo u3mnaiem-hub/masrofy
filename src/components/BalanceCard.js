@@ -20,11 +20,13 @@ import {
 } from '../utils/smartVoiceFlow';
 
 export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelSheet, onOpenPayCc, viewTrigger = 0 }) => {
-  const { balances, currency, formatAmount, isArabic, isDarkMode, themeColors } = useExpense();
+  const { balances, currency, formatAmount, isArabic, isDarkMode, isBalancesHidden, themeColors } = useExpense();
   const [showPlasticCards, setShowPlasticCards] = useState(true);
   const [reduceMotionEnabled, setReduceMotionEnabled] = useState(false);
   const [foregroundCycle, setForegroundCycle] = useState(0);
   const blinkAnim = useRef(new Animated.Value(1)).current;
+  const grossBlinkAnim = useRef(new Animated.Value(1)).current;
+  const debtBlinkAnim = useRef(new Animated.Value(1)).current;
 
   const bankCardsList = [
     {
@@ -162,54 +164,106 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
     (balances.availDc || 0) +
     ((balances.customDebitCardsSummary || []).reduce((sum, d) => sum + (d.avail || 0), 0));
 
+  const totalCcDebtValue = balances.totalCcDebt || 0;
+
+  // Format Gross Available divided by 1000, floored to 1 decimal place + "K" (e.g. 15,234 -> 15.2K)
+  const formatGrossInK = (val) => {
+    if (isBalancesHidden) return '••••';
+    const num = Number(val) || 0;
+    const flooredK = Math.floor((num / 1000) * 10) / 10;
+    return `${flooredK.toFixed(1)}K`;
+  };
+
+  // Blink Gross Available 10 times on startup/foreground if < 15,000 (even 14.99k), then stay solid
+  const isGrossLow = grossAvailableBeforeCards < 15000;
+  useEffect(() => {
+    grossBlinkAnim.stopAnimation();
+    grossBlinkAnim.setValue(1);
+    if (!isGrossLow || reduceMotionEnabled) return;
+
+    const singleBlink = Animated.sequence([
+      Animated.timing(grossBlinkAnim, { toValue: 0.15, duration: 280, useNativeDriver: true }),
+      Animated.timing(grossBlinkAnim, { toValue: 1, duration: 280, useNativeDriver: true }),
+    ]);
+    const loop = Animated.loop(singleBlink, { iterations: 10 });
+    loop.start(() => {
+      grossBlinkAnim.setValue(1);
+    });
+    return () => {
+      loop.stop();
+      grossBlinkAnim.setValue(1);
+    };
+  }, [isGrossLow, reduceMotionEnabled, foregroundCycle, grossBlinkAnim]);
+
+  // Blink Card Debts 5 times on startup/foreground if > 3,500, then stay solid
+  const isDebtHigh = totalCcDebtValue > 3500;
+  useEffect(() => {
+    debtBlinkAnim.stopAnimation();
+    debtBlinkAnim.setValue(1);
+    if (!isDebtHigh || reduceMotionEnabled) return;
+
+    const singleBlink = Animated.sequence([
+      Animated.timing(debtBlinkAnim, { toValue: 0.15, duration: 300, useNativeDriver: true }),
+      Animated.timing(debtBlinkAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+    ]);
+    const loop = Animated.loop(singleBlink, { iterations: 5 });
+    loop.start(() => {
+      debtBlinkAnim.setValue(1);
+    });
+    return () => {
+      loop.stop();
+      debtBlinkAnim.setValue(1);
+    };
+  }, [isDebtHigh, reduceMotionEnabled, foregroundCycle, debtBlinkAnim]);
+
   return (
     <View style={[styles.card, SHADOWS.medium, { borderColor: themeColors.primaryLight, borderWidth: 1.5 }, isDarkMode && { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
-      {/* 1. TOP SPOTLIGHT: صافي الرصيد المتبقي (بعد خصم الكروت) وتحته صافي الرصيد المتواجد (بدون خصم الكروت) وجنبهم النسبة المئوية */}
+      {/* 1. TOP SPOTLIGHT: صافي الرصيد المتواجد (بالأعلى مقسوم على 1000 مع K) وتحته ديون الكروت (بالأحمر) وجنبهم النسبة المئوية داخل مستطيل بيج فاتح بظل واضح */}
       <View
         style={[
           styles.netContainer,
-          isDarkMode && { backgroundColor: '#1E293B', borderColor: '#334155' },
+          isDarkMode && { backgroundColor: '#363126', borderColor: '#5C513D' },
           isArabic ? { flexDirection: 'row-reverse' } : { flexDirection: 'row' },
         ]}
       >
-        {/* Right column in Arabic: Both Balances stacked one under the other */}
+        {/* Right column in Arabic: صافي الرصيد المتواجد + ديون الكروت */}
         <View style={[styles.netBalancesCol, isArabic ? { alignItems: 'flex-end' } : { alignItems: 'flex-start' }]}>
-          {/* Balance 1: بعد خصم الكروت */}
+          {/* Top Balance: صافي الرصيد المتواجد */}
           <View style={[styles.balanceBlock, isArabic && { alignItems: 'flex-end' }]}>
-            <Text style={[styles.netLabel, isDarkMode && { color: themeColors.textSecondary }]} numberOfLines={1}>
-              {isArabic ? 'صافي الرصيد المتبقي (بعد CC)' : 'Net Available (After CC)'}
+            <Text style={[styles.netLabel, isDarkMode && { color: '#EAD7A7' }]} numberOfLines={1}>
+              {isArabic ? 'صافي الرصيد المتواجد' : 'Gross Available'}
             </Text>
-            <View style={[styles.balanceValRow, isArabic && { flexDirection: 'row-reverse' }]}>
+            <Animated.View style={[styles.balanceValRow, { opacity: grossBlinkAnim }, isArabic && { flexDirection: 'row-reverse' }]}>
               <Text
                 style={[styles.balanceValNumber, isDarkMode && { color: '#34D399' }]}
                 numberOfLines={1}
                 adjustsFontSizeToFit={true}
                 minimumFontScale={0.8}
               >
-                {formatAmount(balances.netAvailableAfterCards)}
+                {formatGrossInK(grossAvailableBeforeCards)}
               </Text>
               <Text style={[styles.balanceValCurrency, isDarkMode && { color: '#6EE7B7' }]}> {currency.symbol}</Text>
-            </View>
+            </Animated.View>
           </View>
 
-          <View style={[styles.netDividerH, isDarkMode && { backgroundColor: '#334155' }]} />
+          <View style={[styles.netDividerH, isDarkMode && { backgroundColor: '#5C513D' }]} />
 
-          {/* Balance 2: بدون خصم الكروت (بنفس الحجم واللون الأخضر الغامق) */}
+          {/* Bottom Balance: ديون الكروت (بالأحمر دائماً بدون تقريب أو قسمة على الألف) */}
           <View style={[styles.balanceBlock, isArabic && { alignItems: 'flex-end' }]}>
-            <Text style={[styles.netGrossLabel, isDarkMode && { color: themeColors.textSecondary }]} numberOfLines={1}>
-              {isArabic ? 'صافي الرصيد المتواجد (No CC)' : 'Gross Available (No CC)'}
+            <Text style={[styles.netDebtLabel, isDarkMode && { color: '#FCA5A5' }]} numberOfLines={1}>
+              {isArabic ? 'ديون الكروت' : 'Card Debts'}
             </Text>
-            <View style={[styles.balanceValRow, isArabic && { flexDirection: 'row-reverse' }]}>
+            <Animated.View style={[styles.balanceValRow, { opacity: debtBlinkAnim }, isArabic && { flexDirection: 'row-reverse' }]}>
               <Text
-                style={[styles.balanceGrossValNumber, isDarkMode && { color: '#34D399' }]}
+                style={[styles.balanceDebtValNumber, isDarkMode && { color: '#F87171' }]}
                 numberOfLines={1}
                 adjustsFontSizeToFit={true}
                 minimumFontScale={0.8}
               >
-                {formatAmount(grossAvailableBeforeCards)}
+                {formatAmount(totalCcDebtValue)}
               </Text>
-              <Text style={[styles.balanceValCurrency, isDarkMode && { color: '#6EE7B7' }]}> {currency.symbol}</Text>
-            </View>
+              <Text style={[styles.balanceDebtCurrency, isDarkMode && { color: '#FCA5A5' }]}> {currency.symbol}</Text>
+            </Animated.View>
           </View>
         </View>
 
@@ -845,16 +899,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.primaryDark,
   },
-  // Section 1 (Top): Two Net Balances (Dark Green, Large) + Left Consumption Badge with prominent shadow
+  // Section 1 (Top): Light Beige Box with Gross Available (Dark Green, K) + Card Debts (Red) + Consumption Badge & prominent shadow
   netContainer: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#FAF3E0',
     borderRadius: 16,
     paddingVertical: 11,
     paddingHorizontal: 12,
     marginBottom: 13,
-    borderWidth: 1.2,
-    borderColor: '#CBD5E1',
+    borderWidth: 1.3,
+    borderColor: '#E5D3B3',
     gap: 10,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 6 },
@@ -874,9 +928,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 1,
   },
-  netGrossLabel: {
+  netDebtLabel: {
     fontSize: 10.5,
-    color: '#065F46',
+    color: '#B91C1C',
     fontWeight: '700',
     marginBottom: 1,
   },
@@ -890,11 +944,11 @@ const styles = StyleSheet.create({
     letterSpacing: -0.4,
     color: '#065F46',
   },
-  balanceGrossValNumber: {
+  balanceDebtValNumber: {
     fontSize: 22,
     fontWeight: '900',
     letterSpacing: -0.4,
-    color: '#065F46',
+    color: '#DC2626',
   },
   balanceValCurrency: {
     fontSize: 12,
@@ -902,9 +956,15 @@ const styles = StyleSheet.create({
     color: '#047857',
     marginHorizontal: 2,
   },
+  balanceDebtCurrency: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#DC2626',
+    marginHorizontal: 2,
+  },
   netDividerH: {
     height: 1,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: '#E5D3B3',
     width: '100%',
     marginVertical: 5,
   },
