@@ -31,7 +31,7 @@ const addOneMonth = (dateStr) => {
 const isValidDate = (s) => /^\d{4}-\d{2}-\d{2}$/.test((s || '').trim()) && !isNaN(new Date(s).getTime());
 
 export const RolloverModal = ({ visible, onClose }) => {
-  const { balances, startNewMonthCycle, currency, formatAmount, isArabic, transactions } = useExpense();
+  const { balances, startNewMonthCycle, currency, formatAmount, isArabic, transactions, deletedAccountIds } = useExpense();
 
   const [newStart, setNewStart] = useState('');
   const [newEnd, setNewEnd] = useState('');
@@ -39,9 +39,12 @@ export const RolloverModal = ({ visible, onClose }) => {
   const [extraCash, setExtraCash] = useState('');
   const [busy, setBusy] = useState(false);
 
+  const isDeleted = (id) => (deletedAccountIds || []).includes(id);
+
   useEffect(() => {
     if (visible) {
-      const s = balances?.cycleEndDate || new Date().toISOString().split('T')[0];
+      // Flexible salary cycle: default start date to today (independent of calendar day 1)
+      const s = new Date().toISOString().split('T')[0];
       setNewStart(s);
       setNewEnd(addOneMonth(s));
       setExtraDc('');
@@ -127,9 +130,16 @@ export const RolloverModal = ({ visible, onClose }) => {
           </View>
 
           <ScrollView contentContainerStyle={styles.body}>
-            {/* Step 1: new month dates */}
+            {/* Step 1: new month dates (Flexible Salary Cycle) */}
+            <View style={styles.flexCycleBanner}>
+              <Text style={[styles.flexCycleText, isArabic && { textAlign: 'right' }]}>
+                {isArabic
+                  ? '💡 إغلاق وفتح الشهر مرن حسب موعد نزول الراتب (25 أو 30 أو 37 يوماً) ولا يرتبط بيوم 1 ميلادي — ويحتفظ كل كارت ائتمان بتاريخ استحقاقه الفعلي (25 من الشهر المستحق).'
+                  : '💡 Closing/opening a month is flexible based on salary date (e.g. 25–37 days, independent of calendar day 1) while preserving each credit card’s exact 25th due date.'}
+              </Text>
+            </View>
             <Text style={[styles.section, isArabic && { textAlign: 'right' }]}>
-              {isArabic ? '1) تواريخ الشهر الجديد' : '1) New month dates'}
+              {isArabic ? '1) تواريخ الشهر الجديد (مرنة حسب الراتب)' : '1) New month dates (Flexible)'}
             </Text>
             <View style={[styles.dateRow, isArabic && { flexDirection: 'row-reverse' }]}>
               <View style={{ flex: 1 }}>
@@ -173,13 +183,17 @@ export const RolloverModal = ({ visible, onClose }) => {
               </View>
             </View>
 
-            {/* Step 3: unpaid credit cards */}
+            {/* Step 3: unpaid credit cards (preserving exact due dates) */}
             <Text style={[styles.section, isArabic && { textAlign: 'right' }]}>
-              {isArabic ? '3) غير المسدد من الكروت ➜ يُضاف للمستحق' : '3) Unpaid credit cards ➜ added to dues'}
+              {isArabic ? '3) غير المسدد من الكروت (مع الاحتفاظ بتاريخ استحقاق كل كارت)' : '3) Unpaid credit cards (preserving exact due dates)'}
             </Text>
             <View style={[styles.card, { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }]}>
-              <Row label={isArabic ? '💳 البنك العربي (CC AR)' : '💳 Arab Bank (CC AR)'} to={Math.round(balances?.ccArDebt || 0)} color="#DC2626" />
-              <Row label={isArabic ? '💳 كريدي أجريكول (CC CA)' : '💳 Crédit Agricole (CC CA)'} to={Math.round(balances?.ccCaDebt || 0)} color="#D97706" />
+              {!isDeleted('cc_ar') && (
+                <Row label={isArabic ? '💳 البنك العربي (CC AR)' : '💳 Arab Bank (CC AR)'} to={Math.round(balances?.ccArDebt || 0)} color="#DC2626" />
+              )}
+              {!isDeleted('cc_ca') && (
+                <Row label={isArabic ? '💳 كريدي أجريكول (CC CA)' : '💳 Crédit Agricole (CC CA)'} to={Math.round(balances?.ccCaDebt || 0)} color="#D97706" />
+              )}
               {customCredits.map((c) => (
                 <Row key={c.id} label={`💳 ${c.bankName} (CC)`} to={Math.round(c.totalDebt)} color="#D97706" />
               ))}
@@ -221,6 +235,8 @@ const styles = StyleSheet.create({
   closeBtn: { padding: 6, borderRadius: 12, backgroundColor: COLORS.surfaceSecondary },
   body: { padding: 18, paddingBottom: 30 },
   section: { fontSize: 13, fontWeight: '800', color: COLORS.textPrimary, marginTop: 6, marginBottom: 8 },
+  flexCycleBanner: { backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE', borderRadius: 12, padding: 10, marginBottom: 8 },
+  flexCycleText: { fontSize: 11, fontWeight: '700', color: '#1E40AF', lineHeight: 16 },
   label: { fontSize: 11, fontWeight: '700', color: COLORS.textSecondary, marginBottom: 4 },
   dateRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
   input: { borderWidth: 1.5, borderColor: '#BFDBFE', backgroundColor: '#EFF6FF', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 9, fontSize: 15, fontWeight: '700', color: COLORS.textPrimary, textAlign: 'center' },

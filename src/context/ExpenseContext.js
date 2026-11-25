@@ -8,6 +8,7 @@ import {
   syncMonthlyCreditCardNotifications,
   sendTestCreditCardNotification,
   sendBudgetExceededNotification,
+  sendCertificateInterestNotification,
 } from '../utils/notificationHelper';
 import {
   isBiometricHardwareAvailable,
@@ -39,6 +40,9 @@ const STORAGE_KEYS = {
   BIOMETRIC_ENABLED: '@u3mxpns_v11_biometric_enabled',
   AUTO_LOCK_MINUTE: '@u3mxpns_v11_auto_lock_minute',
   HIDE_BALANCES: '@u3mxpns_v11_hide_balances',
+  DELETED_ACCOUNTS: '@u3mxpns_v11_deleted_accounts',
+  CERTIFICATES: '@u3mxpns_v11_certificates',
+  BKP_MONEY: '@u3mxpns_v11_bkp_money',
 };
 
 // Initial starting funds (halved to 50% of previous mock values)
@@ -62,6 +66,7 @@ export const INITIAL_ALERT_PREFS = {
   budgetAlertsEnabled: true,
   voiceAutoSaveEnabled: true,
   toolbarScrollLocked: false,
+  dailyExpenseReminderEnabled: true,
 };
 
 // Rule: Any Credit Card purchase (CC AR, CC CA, or any custom credit card) is due on the 25th of the FOLLOWING calendar month.
@@ -171,6 +176,9 @@ export const ExpenseProvider = ({ children }) => {
   const [categoryBudgets, setCategoryBudgets] = useState({}); // { [categoryId]: monthlyLimit }
   const [customCategories, setCustomCategories] = useState([]);
   const [deletedCategoryIds, setDeletedCategoryIds] = useState([]);
+  const [deletedAccountIds, setDeletedAccountIds] = useState([]);
+  const [certificates, setCertificates] = useState([]);
+  const [bkpMoney, setBkpMoneyState] = useState('');
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [colorPalette, setColorPaletteState] = useState('emerald');
   const [isBalancesHidden, setIsBalancesHidden] = useState(false);
@@ -229,6 +237,21 @@ export const ExpenseProvider = ({ children }) => {
         const storedPin = await AsyncStorage.getItem(STORAGE_KEYS.APP_PIN);
         const storedBiometric = await AsyncStorage.getItem(STORAGE_KEYS.BIOMETRIC_ENABLED);
         const storedAutoLock = await AsyncStorage.getItem(STORAGE_KEYS.AUTO_LOCK_MINUTE);
+        const storedDeletedAcc = await AsyncStorage.getItem(STORAGE_KEYS.DELETED_ACCOUNTS);
+        const storedCertificates = await AsyncStorage.getItem(STORAGE_KEYS.CERTIFICATES);
+        const storedBkpMoney = await AsyncStorage.getItem(STORAGE_KEYS.BKP_MONEY);
+
+        if (storedDeletedAcc !== null) {
+          setDeletedAccountIds(JSON.parse(storedDeletedAcc) || []);
+        }
+
+        if (storedCertificates !== null) {
+          setCertificates(JSON.parse(storedCertificates) || []);
+        }
+
+        if (storedBkpMoney !== null) {
+          setBkpMoneyState(storedBkpMoney);
+        }
 
         if (storedDarkMode !== null) {
           setIsDarkMode(JSON.parse(storedDarkMode));
@@ -296,18 +319,64 @@ export const ExpenseProvider = ({ children }) => {
           setCustomAccounts(JSON.parse(storedCustomAcc));
         }
 
+        let loadedArchives = [];
         if (storedArchives !== null) {
           const rawArch = JSON.parse(storedArchives) || [];
-          setArchivedMonths(
-            rawArch.map((a) => ({
-              ...a,
-              transactions: sanitizeRecordsList(a.transactions || []),
-            }))
-          );
+          loadedArchives = rawArch.map((a) => ({
+            ...a,
+            transactions: sanitizeRecordsList(a.transactions || []),
+          }));
+          setArchivedMonths(loadedArchives);
         }
 
         if (storedCarryOvers !== null) {
-          setCarryOvers(JSON.parse(storedCarryOvers));
+          let parsedCarry = JSON.parse(storedCarryOvers) || {};
+
+          // Auto-repair legacy rollover carryOvers (created before dueThisDate/dueNextDate tracking):
+          // Inspect the most recent archived month's transactions so debt due on 25th of NEXT month
+          // (e.g. Crédit Agricole 25/12) is restored to dueNextMonth instead of 25/11!
+          if (!parsedCarry.dueThisDate && !parsedCarry.dueNextDate && loadedArchives.length > 0) {
+            const nowRepair = new Date();
+            const rY = nowRepair.getFullYear();
+            const rM = nowRepair.getMonth() + 1;
+            const rNextM = rM === 12 ? 1 : rM + 1;
+            const rNextY = rM === 12 ? rY + 1 : rY;
+            const curDueIso = `${rY}-${String(rM).padStart(2, '0')}-25`;
+            const nextDueIso = `${rNextY}-${String(rNextM).padStart(2, '0')}-25`;
+
+            const lastArchTx = loadedArchives[0]?.transactions || [];
+            let arArchNext = 0;
+            let caArchNext = 0;
+            lastArchTx.forEach((t) => {
+              if (!t || t.type === 'income' || t.type === 'switch' || t.type === 'cc_pyd') return;
+              const amt = parseFloat(t.amount) || 0;
+              const effDue = t.dueDate || getCreditCardDueDate(t.date);
+              if (effDue > curDueIso) {
+                if (t.paymentMethod === 'cc_ca') caArchNext += amt;
+                else if (t.paymentMethod === 'cc_ar') arArchNext += amt;
+              }
+            });
+
+            const legacyCa = parseFloat(parsedCarry.cc_ca) || 0;
+            const legacyAr = parseFloat(parsedCarry.cc_ar) || 0;
+            const movedCaToNext = Math.min(legacyCa, Math.round(caArchNext));
+            const movedArToNext = Math.min(legacyAr, Math.round(arArchNext));
+
+            if (movedCaToNext > 0 || movedArToNext > 0) {
+              parsedCarry = {
+                ...parsedCarry,
+                cc_ca: Math.max(0, legacyCa - movedCaToNext),
+                cc_ca_next: (parseFloat(parsedCarry.cc_ca_next) || 0) + movedCaToNext,
+                cc_ar: Math.max(0, legacyAr - movedArToNext),
+                cc_ar_next: (parseFloat(parsedCarry.cc_ar_next) || 0) + movedArToNext,
+                dueThisDate: curDueIso,
+                dueNextDate: nextDueIso,
+              };
+              await AsyncStorage.setItem(STORAGE_KEYS.CARRY_OVERS, JSON.stringify(parsedCarry));
+            }
+          }
+
+          setCarryOvers(parsedCarry);
         } else {
           await AsyncStorage.setItem(STORAGE_KEYS.CARRY_OVERS, JSON.stringify(INITIAL_CARRY_OVERS));
         }
@@ -484,33 +553,49 @@ export const ExpenseProvider = ({ children }) => {
     return true;
   };
 
-  // Combined payment methods (built-in + custom debit/credit cards)
+  // Combined payment methods (active built-in + custom debit/credit cards, all treated as primary)
+  const LINKED_ACC_LABELS = {
+    current: { ar: 'جاري', en: 'Current' },
+    savings: { ar: 'توفير', en: 'Savings' },
+    meeza: { ar: 'ميزة', en: 'Meeza' },
+    credit: { ar: 'ائتمان', en: 'Credit' },
+  };
+
   const allPaymentMethods = useMemo(() => {
     const customMapped = customAccounts.map((acc) => {
       const isCredit = acc.accountType === 'credit';
+      const linkedKey = acc.linkedAccountType || (isCredit ? 'credit' : 'current');
+      const linkedLbl = LINKED_ACC_LABELS[linkedKey] || LINKED_ACC_LABELS.current;
       return {
         id: acc.id,
         accountType: acc.accountType, // 'debit' | 'credit'
+        linkedAccountType: linkedKey,
+        linkedAccountLabelAr: linkedLbl.ar,
+        linkedAccountLabelEn: linkedLbl.en,
         bankName: acc.bankName,
-        name: isCredit ? `${acc.bankName} (CC) 💳` : `${acc.bankName} (DC) 🏦`,
-        nameAr: isCredit ? `${acc.bankName} (ائتمان) 💳` : `${acc.bankName} (حساب بنكي) 🏦`,
+        name: `${acc.bankName} (${linkedLbl.en}) ${isCredit ? '💳' : '🏦'}`,
+        nameAr: `${acc.bankName} (${linkedLbl.ar}) ${isCredit ? '💳' : '🏦'}`,
         icon: isCredit ? 'credit-card-clock-outline' : 'credit-card-outline',
         shortName: acc.bankName,
         shortNameAr: acc.bankName,
         startingBalance: parseFloat(acc.startingBalance) || 0,
         carryOverDueThisMonth: parseFloat(acc.carryOverDueThisMonth) || 0,
+        carryOverDueNextMonth: parseFloat(acc.carryOverDueNextMonth) || 0,
         isCustom: true,
       };
     });
 
-    const builtInWithType = PAYMENT_METHODS.map((pm) => ({
-      ...pm,
-      accountType: pm.id === 'csh' ? 'cash' : pm.id === 'dc' ? 'debit' : 'credit',
-      isCustom: false,
-    }));
+    const builtInWithType = PAYMENT_METHODS
+      .filter((pm) => !deletedAccountIds.includes(pm.id))
+      .map((pm) => ({
+        ...pm,
+        accountType: pm.id === 'csh' ? 'cash' : pm.id === 'dc' ? 'debit' : 'credit',
+        linkedAccountType: pm.id === 'csh' ? 'cash' : pm.id === 'dc' ? 'current' : 'credit',
+        isCustom: false,
+      }));
 
     return [...builtInWithType, ...customMapped];
-  }, [customAccounts]);
+  }, [customAccounts, deletedAccountIds]);
 
   const getCategory = (id) => {
     const customFound = (allExpenseCategories || []).find((c) => c.id === id);
@@ -524,7 +609,7 @@ export const ExpenseProvider = ({ children }) => {
   };
 
   const getAccountById = (id) => {
-    const found = allPaymentMethods.find((p) => p.id === id) || allPaymentMethods[0];
+    const found = allPaymentMethods.find((p) => p.id === id) || allPaymentMethods[0] || PAYMENT_METHODS[0];
     return {
       ...found,
       displayName: language === 'ar' ? (found.nameAr || found.name) : found.name,
@@ -532,16 +617,26 @@ export const ExpenseProvider = ({ children }) => {
     };
   };
 
-  const addCustomAccount = async ({ bankName, accountType = 'credit', startingBalance = 0, carryOverDueThisMonth = 0 }) => {
+  const addCustomAccount = async ({
+    bankName,
+    accountType = 'credit',
+    linkedAccountType,
+    startingBalance = 0,
+    carryOverDueThisMonth = 0,
+  }) => {
     const cleanName = (bankName || '').trim();
     if (!cleanName) return null;
-    const prefix = accountType === 'credit' ? 'cc_custom_' : 'dc_custom_';
+    const normType = accountType === 'debit' ? 'debit' : 'credit';
+    const normLinked = linkedAccountType || (normType === 'credit' ? 'credit' : 'current');
+    const prefix = normType === 'credit' ? 'cc_custom_' : 'dc_custom_';
     const newAcc = {
       id: prefix + Date.now(),
       bankName: cleanName,
-      accountType: accountType === 'debit' ? 'debit' : 'credit',
+      accountType: normType,
+      linkedAccountType: normLinked,
       startingBalance: parseFloat(startingBalance) || 0,
       carryOverDueThisMonth: parseFloat(carryOverDueThisMonth) || 0,
+      carryOverDueNextMonth: 0,
       createdAt: Date.now(),
     };
     const updated = [...customAccounts, newAcc];
@@ -562,6 +657,104 @@ export const ExpenseProvider = ({ children }) => {
     } catch (e) {
       console.error('Error deleting custom account:', e);
     }
+  };
+
+  const deleteBuiltInAccount = async (id) => {
+    if (!id || id === 'csh') return false; // Cash wallet stays as core cash account
+    const updated = Array.from(new Set([...deletedAccountIds, id]));
+    setDeletedAccountIds(updated);
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.DELETED_ACCOUNTS, JSON.stringify(updated));
+    } catch (e) {
+      console.error('Error deleting built-in account:', e);
+    }
+    return true;
+  };
+
+  const restoreBuiltInAccounts = async () => {
+    setDeletedAccountIds([]);
+    try {
+      await AsyncStorage.removeItem(STORAGE_KEYS.DELETED_ACCOUNTS);
+    } catch {}
+    return true;
+  };
+
+  // Emergency Cash Notes ("bkp money") — purely informational, never tied to calculations
+  const updateBkpMoney = async (text) => {
+    const val = text == null ? '' : String(text);
+    setBkpMoneyState(val);
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.BKP_MONEY, val);
+    } catch (e) {
+      console.error('Error saving bkp money:', e);
+    }
+  };
+
+  // Certificates & Deposits ("شهادات وودائع")
+  const computeCertificatePeriodicYield = (cert) => {
+    const principal = parseFloat(cert?.principal) || 0;
+    const rate = parseFloat(cert?.interestRate) || 0;
+    if (principal <= 0 || rate <= 0) return 0;
+    if (cert?.frequency === 'daily') {
+      return Math.round(((principal * (rate / 100)) / 365) * 100) / 100;
+    }
+    const intervalMonths = [1, 3, 6, 12].includes(Number(cert?.monthlyInterval))
+      ? Number(cert.monthlyInterval)
+      : 1;
+    return Math.round(((principal * (rate / 100) * intervalMonths) / 12) * 100) / 100;
+  };
+
+  const saveCertificatesList = async (nextList) => {
+    setCertificates(nextList);
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.CERTIFICATES, JSON.stringify(nextList));
+    } catch (e) {
+      console.error('Error saving certificates:', e);
+    }
+  };
+
+  const addCertificate = async ({
+    kind = 'certificate', // 'certificate' | 'deposit'
+    name,
+    bankName = '',
+    principal,
+    endDate,
+    interestRate,
+    rateType = 'fixed', // 'fixed' | 'variable'
+    frequency = 'monthly', // 'daily' | 'monthly'
+    monthlyInterval = 1, // 1 | 3 | 6 | 12
+    payoutDate = '', // YYYY-MM-DD or day of month
+    targetAccount = 'dc',
+  }) => {
+    const cleanName = (name || bankName || '').trim();
+    const numPrincipal = parseFloat(principal) || 0;
+    const numRate = parseFloat(interestRate) || 0;
+    if (!cleanName || numPrincipal <= 0) return null;
+
+    const newCert = {
+      id: 'cert_' + Date.now(),
+      kind: kind === 'deposit' ? 'deposit' : 'certificate',
+      name: cleanName,
+      bankName: (bankName || '').trim(),
+      principal: numPrincipal,
+      endDate: (endDate || '').trim(),
+      interestRate: numRate,
+      rateType: rateType === 'variable' ? 'variable' : 'fixed',
+      frequency: frequency === 'daily' ? 'daily' : 'monthly',
+      monthlyInterval: frequency === 'daily' ? 0 : ([1, 3, 6, 12].includes(Number(monthlyInterval)) ? Number(monthlyInterval) : 1),
+      payoutDate: (payoutDate || new Date().toISOString().split('T')[0]).trim(),
+      targetAccount: targetAccount || 'dc',
+      lastPayoutDate: null,
+      createdAt: Date.now(),
+    };
+    const updated = [newCert, ...certificates];
+    await saveCertificatesList(updated);
+    return newCert;
+  };
+
+  const deleteCertificate = async (id) => {
+    const updated = certificates.filter((c) => c.id !== id);
+    await saveCertificatesList(updated);
   };
 
   const sanitizeTransactionsPaidState = (list) => {
@@ -874,6 +1067,7 @@ export const ExpenseProvider = ({ children }) => {
 
     if (target === 'all' || target === 'cc_ar') {
       newCarryOvers.cc_ar = 0;
+      newCarryOvers.cc_ar_next = 0;
       if (balances.ccArDebt > 0) {
         newTxList.push({
           id: 'tx_zero_ar_' + Date.now(),
@@ -891,6 +1085,7 @@ export const ExpenseProvider = ({ children }) => {
 
     if (target === 'all' || target === 'cc_ca') {
       newCarryOvers.cc_ca = 0;
+      newCarryOvers.cc_ca_next = 0;
       if (balances.ccCaDebt > 0) {
         newTxList.push({
           id: 'tx_zero_ca_' + (Date.now() + 1),
@@ -1016,7 +1211,46 @@ export const ExpenseProvider = ({ children }) => {
   };
 
   const clearAllData = async () => {
-    await saveTransactions([]);
+    const emptyStart = { dc: 0, csh: 0 };
+    const emptyCarry = {
+      cc_ar: 0,
+      cc_ca: 0,
+      cc_ar_next: 0,
+      cc_ca_next: 0,
+      dueThisDate: null,
+      dueNextDate: null,
+    };
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    setTransactions([]);
+    setStartBalances(emptyStart);
+    setCarryOvers(emptyCarry);
+    setCustomAccounts([]);
+    setCertificates([]);
+    setArchivedMonths([]);
+    setCategoryBudgets({});
+    setRecurringBills([]);
+    setSavingsGoals([]);
+    setBkpMoneyState('');
+    setCycleStartDate(todayStr);
+
+    try {
+      await Promise.all([
+        AsyncStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify([])),
+        AsyncStorage.setItem(STORAGE_KEYS.START_BALANCES, JSON.stringify(emptyStart)),
+        AsyncStorage.setItem(STORAGE_KEYS.CARRY_OVERS, JSON.stringify(emptyCarry)),
+        AsyncStorage.setItem(STORAGE_KEYS.CUSTOM_ACCOUNTS, JSON.stringify([])),
+        AsyncStorage.setItem(STORAGE_KEYS.CERTIFICATES, JSON.stringify([])),
+        AsyncStorage.setItem(STORAGE_KEYS.ARCHIVED_MONTHS, JSON.stringify([])),
+        AsyncStorage.setItem(STORAGE_KEYS.CATEGORY_BUDGETS, JSON.stringify({})),
+        AsyncStorage.setItem(STORAGE_KEYS.RECURRING_BILLS, JSON.stringify([])),
+        AsyncStorage.setItem(STORAGE_KEYS.SAVINGS_GOALS, JSON.stringify([])),
+        AsyncStorage.setItem(STORAGE_KEYS.BKP_MONEY, ''),
+        AsyncStorage.setItem(STORAGE_KEYS.CYCLE_START, todayStr),
+      ]);
+    } catch (e) {
+      console.error('Error clearing all data:', e);
+    }
   };
 
   // ==========================================
@@ -1033,6 +1267,52 @@ export const ExpenseProvider = ({ children }) => {
     let ccArPaid = 0;
     let realTotalSpent = 0;
 
+    const isDcDeleted = deletedAccountIds.includes('dc');
+    const isCcArDeleted = deletedAccountIds.includes('cc_ar');
+    const isCcCaDeleted = deletedAccountIds.includes('cc_ca');
+
+    // Current month's 25th vs Following month's 25th (calendar-based billing cycle for Credit Cards,
+    // independent of salary month close/open dates)
+    const now = new Date();
+    const curYear = now.getFullYear();
+    const curMonth = now.getMonth() + 1; // 1..12
+    const nextMonth = curMonth === 12 ? 1 : curMonth + 1;
+    const nextYear = curMonth === 12 ? curYear + 1 : curYear;
+
+    const currentMonthDueDate = `${curYear}-${String(curMonth).padStart(2, '0')}-25`;
+    const nextMonthDueDate = `${nextYear}-${String(nextMonth).padStart(2, '0')}-25`;
+
+    // Split carried-over credit card debt by its actual calendar due date so closing a salary month
+    // (after 25 or 37 days) NEVER shifts 25/12 debt prematurely into 25/11!
+    const splitCarryBuckets = (thisAmt, nextAmt, storedThisDate, storedNextDate) => {
+      let dueThis = 0;
+      let dueNext = 0;
+      const aThis = parseFloat(thisAmt) || 0;
+      const aNext = parseFloat(nextAmt) || 0;
+      if (aThis > 0) {
+        if (storedThisDate && storedThisDate > currentMonthDueDate) {
+          dueNext += aThis;
+        } else {
+          dueThis += aThis;
+        }
+      }
+      if (aNext > 0) {
+        if (storedNextDate && storedNextDate <= currentMonthDueDate) {
+          dueThis += aNext;
+        } else {
+          dueNext += aNext;
+        }
+      }
+      return { dueThis, dueNext };
+    };
+
+    const arCarryBuckets = isCcArDeleted
+      ? { dueThis: 0, dueNext: 0 }
+      : splitCarryBuckets(carryOvers?.cc_ar, carryOvers?.cc_ar_next, carryOvers?.dueThisDate, carryOvers?.dueNextDate);
+    const caCarryBuckets = isCcCaDeleted
+      ? { dueThis: 0, dueNext: 0 }
+      : splitCarryBuckets(carryOvers?.cc_ca, carryOvers?.cc_ca_next, carryOvers?.dueThisDate, carryOvers?.dueNextDate);
+
     // Track custom debit & credit cards
     const customDebitMap = {};
     const customCreditMap = {};
@@ -1047,9 +1327,16 @@ export const ExpenseProvider = ({ children }) => {
           avail: parseFloat(acc.startingBalance) || 0,
         };
       } else {
+        const cBuckets = splitCarryBuckets(
+          acc.carryOverDueThisMonth,
+          acc.carryOverDueNextMonth,
+          acc.carryOverThisDate,
+          acc.carryOverNextDate
+        );
         customCreditMap[acc.id] = {
           ...acc,
-          carryOver: parseFloat(acc.carryOverDueThisMonth) || 0,
+          carryOver: cBuckets.dueThis,
+          carryOverNext: cBuckets.dueNext,
           purchasesDueThisMonth: 0,
           purchasesDueNextMonth: 0,
           paid: 0,
@@ -1060,23 +1347,15 @@ export const ExpenseProvider = ({ children }) => {
       }
     });
 
-    // Current month's 25th vs Following month's 25th
-    const now = new Date();
-    const curYear = now.getFullYear();
-    const curMonth = now.getMonth() + 1; // 1..12
-    const nextMonth = curMonth === 12 ? 1 : curMonth + 1;
-    const nextYear = curMonth === 12 ? curYear + 1 : curYear;
-
-    const currentMonthDueDate = `${curYear}-${String(curMonth).padStart(2, '0')}-25`;
-    const nextMonthDueDate = `${nextYear}-${String(nextMonth).padStart(2, '0')}-25`;
-
     let ccArPurchasesDueThisMonth = 0;
     let ccArPurchasesDueNextMonth = 0;
     let ccCaPurchasesDueThisMonth = 0;
     let ccCaPurchasesDueNextMonth = 0;
 
-    const initialArCarryOver = parseFloat(carryOvers?.cc_ar) || 0;
-    const initialCaCarryOver = parseFloat(carryOvers?.cc_ca) || 0;
+    const initialArCarryOver = arCarryBuckets.dueThis;
+    const initialArCarryOverNext = arCarryBuckets.dueNext;
+    const initialCaCarryOver = caCarryBuckets.dueThis;
+    const initialCaCarryOverNext = caCarryBuckets.dueNext;
 
     sortedTransactions.forEach((tx) => {
       const amt = parseFloat(tx.amount) || 0;
@@ -1161,8 +1440,9 @@ export const ExpenseProvider = ({ children }) => {
     // Include the 1 EGP Excel baseline row 10 adjustment when using the default Oct 22 cycle
     const baselineCshAdj = cycleStartDate === INITIAL_CYCLE_START && sortedTransactions.some((t) => t.id === 'tx_init_1') ? 1 : 0;
 
-    const availDc = startBalances.dc - dcOut + dcIn;
-    const availCsh = startBalances.csh - (cshOut + baselineCshAdj) + cshIn;
+    const effStartDc = isDcDeleted ? 0 : (parseFloat(startBalances.dc) || 0);
+    const availDc = isDcDeleted ? 0 : (effStartDc - dcOut + dcIn);
+    const availCsh = (parseFloat(startBalances.csh) || 0) - (cshOut + baselineCshAdj) + cshIn;
 
     // Finalize Custom Debit Cards
     let customDebitTotalAvail = 0;
@@ -1174,16 +1454,16 @@ export const ExpenseProvider = ({ children }) => {
       return { ...d, avail };
     });
 
-    // Finalize Arab Bank & Credit Agricole
-    const ccArGrossDueThisMonth = initialArCarryOver + ccArPurchasesDueThisMonth;
-    const ccArDueThisMonth = Math.max(0, ccArGrossDueThisMonth - ccArPaid);
-    const arOverpaidAfterThisMonth = Math.max(0, ccArPaid - ccArGrossDueThisMonth);
-    const ccArDueNextMonth = Math.max(0, ccArPurchasesDueNextMonth - arOverpaidAfterThisMonth);
+    // Finalize Arab Bank & Credit Agricole (respecting deleted built-in cards & exact calendar due dates)
+    const ccArGrossDueThisMonth = isCcArDeleted ? 0 : (initialArCarryOver + ccArPurchasesDueThisMonth);
+    const ccArDueThisMonth = isCcArDeleted ? 0 : Math.max(0, ccArGrossDueThisMonth - ccArPaid);
+    const arOverpaidAfterThisMonth = isCcArDeleted ? 0 : Math.max(0, ccArPaid - ccArGrossDueThisMonth);
+    const ccArDueNextMonth = isCcArDeleted ? 0 : Math.max(0, (initialArCarryOverNext + ccArPurchasesDueNextMonth) - arOverpaidAfterThisMonth);
 
-    const ccCaGrossDueThisMonth = initialCaCarryOver + ccCaPurchasesDueThisMonth;
-    const ccCaDueThisMonth = Math.max(0, ccCaGrossDueThisMonth - ccCaPaid);
-    const caOverpaidAfterThisMonth = Math.max(0, ccCaPaid - ccCaGrossDueThisMonth);
-    const ccCaDueNextMonth = Math.max(0, ccCaPurchasesDueNextMonth - caOverpaidAfterThisMonth);
+    const ccCaGrossDueThisMonth = isCcCaDeleted ? 0 : (initialCaCarryOver + ccCaPurchasesDueThisMonth);
+    const ccCaDueThisMonth = isCcCaDeleted ? 0 : Math.max(0, ccCaGrossDueThisMonth - ccCaPaid);
+    const caOverpaidAfterThisMonth = isCcCaDeleted ? 0 : Math.max(0, ccCaPaid - ccCaGrossDueThisMonth);
+    const ccCaDueNextMonth = isCcCaDeleted ? 0 : Math.max(0, (initialCaCarryOverNext + ccCaPurchasesDueNextMonth) - caOverpaidAfterThisMonth);
 
     // Finalize Custom Credit Cards
     let customCcDueThisMonthTotal = 0;
@@ -1193,7 +1473,7 @@ export const ExpenseProvider = ({ children }) => {
       const grossThis = c.carryOver + c.purchasesDueThisMonth;
       const dueThis = Math.max(0, grossThis - c.paid);
       const overpaid = Math.max(0, c.paid - grossThis);
-      const dueNext = Math.max(0, c.purchasesDueNextMonth - overpaid);
+      const dueNext = Math.max(0, (c.carryOverNext + c.purchasesDueNextMonth) - overpaid);
       const totalDebt = dueThis + dueNext;
       customCcDueThisMonthTotal += dueThis;
       customCcDueNextMonthTotal += dueNext;
@@ -1217,15 +1497,13 @@ export const ExpenseProvider = ({ children }) => {
     const totalCcPaid = ccCaPaid + ccArPaid + customCcPaidTotal;
 
     // Net Cash + Bank Outflow (excluding internal 'switch' transfers that cancel out +2000/-2000, and subtracting incoming deposits)
-    // Matches Excel B5 + C5 = (4446 + 1936) = 6382 EGP
-    const netCashAndDcOutflow = (dcOut - dcIn) + (cshOut + baselineCshAdj - cshIn);
+    const netCashAndDcOutflow = (isDcDeleted ? 0 : (dcOut - dcIn)) + (cshOut + baselineCshAdj - cshIn);
 
-    // Total Outflow / Total Obligations matching Excel cell C2 (B5 + C5 + G6 = 4446 + 1936 + 2728 = 9110 EGP)
-    // Purely excludes internal 'switch' transfers (0 net impact) while counting all cash/bank outflows + remaining CC debt
+    // Total Outflow / Total Obligations
     const totalOutflow = netCashAndDcOutflow + totalCcDebt;
 
-    // Net available money left after clearing cards (matches Excel D2: 31430 - 9110 = 22320 EGP)
-    const totalStartedWith = startBalances.dc + startBalances.csh + customDebitTotalStart;
+    // Net available money left after clearing cards
+    const totalStartedWith = effStartDc + (parseFloat(startBalances.csh) || 0) + customDebitTotalStart;
     const netAvailableAfterCards = availDc + availCsh + customDebitTotalAvail - totalCcDebt;
 
     // Cycle Days calculation (using cycleStartDate and cycleEndDate)
@@ -1300,7 +1578,7 @@ export const ExpenseProvider = ({ children }) => {
       daysMoneyLasts: Math.round(daysMoneyLasts),
       safeDailySpend: Math.round(safeDailySpend),
     };
-  }, [sortedTransactions, startBalances, cycleStartDate, cycleEndDate, carryOvers, customAccounts]);
+  }, [sortedTransactions, startBalances, cycleStartDate, cycleEndDate, carryOvers, customAccounts, deletedAccountIds]);
 
   // "ترحيل وفتح شهر جديد" (Rollover & Open New Month):
   // 1. Saves all current month's transactions and summary balances into `archivedMonths` (History File viewable anytime on screen).
@@ -1359,12 +1637,17 @@ export const ExpenseProvider = ({ children }) => {
     const nextCshStart = Math.max(0, Math.round(balances.availCsh + (parseFloat(extraCashDeposit) || 0)));
     const nextDcStart = Math.max(0, Math.round(balances.availDc + (parseFloat(extraDcDeposit) || 0)));
 
+    // Preserve exact calendar due dates (25th of this month vs 25th of next month) independently of salary cycle close date!
     const nextCarryOvers = {
-      cc_ar: Math.max(0, Math.round(balances.ccArDebt)),
-      cc_ca: Math.max(0, Math.round(balances.ccCaDebt)),
+      cc_ar: Math.max(0, Math.round(balances.ccArDueThisMonth || 0)),
+      cc_ar_next: Math.max(0, Math.round(balances.ccArDueNextMonth || 0)),
+      cc_ca: Math.max(0, Math.round(balances.ccCaDueThisMonth || 0)),
+      cc_ca_next: Math.max(0, Math.round(balances.ccCaDueNextMonth || 0)),
+      dueThisDate: balances.currentMonthDueDate,
+      dueNextDate: balances.nextMonthDueDate,
     };
 
-    // Also roll over custom accounts (remaining debit avail -> startingBalance, totalDebt -> carryOverDueThisMonth)
+    // Also roll over custom accounts preserving dueThisMonth & dueNextMonth with exact due dates
     const updatedCustom = customAccounts.map((acc) => {
       if (acc.accountType === 'debit') {
         const foundD = (balances.customDebitCardsSummary || []).find((d) => d.id === acc.id);
@@ -1376,7 +1659,10 @@ export const ExpenseProvider = ({ children }) => {
         const foundC = (balances.customCreditCardsSummary || []).find((c) => c.id === acc.id);
         return {
           ...acc,
-          carryOverDueThisMonth: foundC ? Math.max(0, Math.round(foundC.totalDebt)) : acc.carryOverDueThisMonth,
+          carryOverDueThisMonth: foundC ? Math.max(0, Math.round(foundC.dueThisMonth || 0)) : acc.carryOverDueThisMonth,
+          carryOverDueNextMonth: foundC ? Math.max(0, Math.round(foundC.dueNextMonth || 0)) : (acc.carryOverDueNextMonth || 0),
+          carryOverThisDate: balances.currentMonthDueDate,
+          carryOverNextDate: balances.nextMonthDueDate,
         };
       }
     });
@@ -1735,7 +2021,120 @@ export const ExpenseProvider = ({ children }) => {
     };
   }, [autoLockAfterMinute, appPin, biometricEnabled, biometricHardwareAvailable]);
 
-  // Automatically request Android notification permissions & schedule monthly 20th-25th reminders at 12:00 PM (if enabled)
+  // Auto-credit Certificate / Deposit interest payouts into Income + send notification when payout date is reached
+  const certAutoCreditRunningRef = useRef(false);
+  const creditCertificateInterestNow = async (certId) => {
+    const cert = certificates.find((c) => c.id === certId);
+    if (!cert) return false;
+    const yieldAmt = computeCertificatePeriodicYield(cert);
+    if (yieldAmt <= 0) return false;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const kindAr = cert.kind === 'deposit' ? 'وديعة' : 'شهادة';
+    const targetAcc = cert.targetAccount && !deletedAccountIds.includes(cert.targetAccount) ? cert.targetAccount : 'csh';
+
+    await addTransaction({
+      type: 'income',
+      amount: yieldAmt,
+      categoryId: 'incomings',
+      note: language === 'ar' ? `عائد ${kindAr}: ${cert.name} (${cert.interestRate}%)` : `${cert.kind === 'deposit' ? 'Deposit' : 'Certificate'} Interest: ${cert.name} (${cert.interestRate}%)`,
+      date: todayStr,
+      paymentMethod: targetAcc,
+    });
+
+    const updated = certificates.map((c) => (c.id === cert.id ? { ...c, lastPayoutDate: todayStr } : c));
+    await saveCertificatesList(updated);
+    await sendCertificateInterestNotification(cert, yieldAmt, currency, formatAmount, language === 'ar');
+    return true;
+  };
+
+  useEffect(() => {
+    if (isLoading || !Array.isArray(certificates) || certificates.length === 0) return;
+    if (certAutoCreditRunningRef.current) return;
+
+    const checkDueCertificates = async () => {
+      certAutoCreditRunningRef.current = true;
+      try {
+        const now = new Date();
+        const todayStr = now.toISOString().split('T')[0];
+        let changed = false;
+        const nextCerts = [...certificates];
+
+        for (let i = 0; i < nextCerts.length; i++) {
+          const cert = nextCerts[i];
+          if (!cert) continue;
+          // Skip expired certificates
+          if (cert.endDate && /^\d{4}-\d{2}-\d{2}$/.test(cert.endDate) && todayStr > cert.endDate) {
+            continue;
+          }
+          // Already credited today
+          if (cert.lastPayoutDate === todayStr) continue;
+
+          let isDue = false;
+          if (cert.frequency === 'daily') {
+            isDue = !cert.lastPayoutDate || cert.lastPayoutDate < todayStr;
+          } else {
+            const intervalMonths = [1, 3, 6, 12].includes(Number(cert.monthlyInterval)) ? Number(cert.monthlyInterval) : 1;
+            // Extract payout day-of-month from payoutDate (YYYY-MM-DD or numeric day)
+            let payoutDay = 1;
+            if (/^\d{4}-\d{2}-\d{2}$/.test(cert.payoutDate || '')) {
+              payoutDay = Number(cert.payoutDate.split('-')[2]) || 1;
+            } else if (/^\d{1,2}$/.test(cert.payoutDate || '')) {
+              payoutDay = Math.min(28, Math.max(1, Number(cert.payoutDate)));
+            }
+            const todayDay = now.getDate();
+            if (todayDay >= payoutDay) {
+              if (!cert.lastPayoutDate) {
+                // First payout: check if payoutDate (when full YYYY-MM-DD) has arrived
+                if (/^\d{4}-\d{2}-\d{2}$/.test(cert.payoutDate || '')) {
+                  isDue = todayStr >= cert.payoutDate;
+                } else {
+                  isDue = true;
+                }
+              } else {
+                const [ly, lm] = cert.lastPayoutDate.split('-').map(Number);
+                const monthsDiff = (now.getFullYear() - (ly || now.getFullYear())) * 12 + (now.getMonth() + 1 - (lm || 1));
+                isDue = monthsDiff >= intervalMonths;
+              }
+            }
+          }
+
+          if (isDue) {
+            const yieldAmt = computeCertificatePeriodicYield(cert);
+            if (yieldAmt > 0) {
+              const kindAr = cert.kind === 'deposit' ? 'وديعة' : 'شهادة';
+              const targetAcc = cert.targetAccount && !deletedAccountIds.includes(cert.targetAccount) ? cert.targetAccount : 'csh';
+              await addTransaction({
+                type: 'income',
+                amount: yieldAmt,
+                categoryId: 'incomings',
+                note: language === 'ar'
+                  ? `عائد ${kindAr} تلقائي: ${cert.name} (${cert.interestRate}%)`
+                  : `Auto ${cert.kind === 'deposit' ? 'Deposit' : 'Certificate'} Interest: ${cert.name} (${cert.interestRate}%)`,
+                date: todayStr,
+                paymentMethod: targetAcc,
+              });
+              nextCerts[i] = { ...cert, lastPayoutDate: todayStr };
+              changed = true;
+              await sendCertificateInterestNotification(cert, yieldAmt, currency, formatAmount, language === 'ar');
+            }
+          }
+        }
+
+        if (changed) {
+          await saveCertificatesList(nextCerts);
+        }
+      } catch (err) {
+        console.log('Auto certificate payout info:', err?.message);
+      } finally {
+        certAutoCreditRunningRef.current = false;
+      }
+    };
+
+    checkDueCertificates();
+  }, [isLoading, certificates.length]);
+
+  // Automatically request Android notification permissions & schedule monthly 20th-25th reminders + Daily 11:00 PM reminder
   useEffect(() => {
     if (!isLoading) {
       syncMonthlyCreditCardNotifications(
@@ -1743,7 +2142,8 @@ export const ExpenseProvider = ({ children }) => {
         currency,
         formatAmount,
         language === 'ar',
-        alertPrefs.phoneNotificationsEnabled
+        alertPrefs.phoneNotificationsEnabled !== false,
+        alertPrefs.dailyExpenseReminderEnabled !== false
       );
     }
   }, [
@@ -1753,6 +2153,7 @@ export const ExpenseProvider = ({ children }) => {
     language,
     currency.symbol,
     alertPrefs.phoneNotificationsEnabled,
+    alertPrefs.dailyExpenseReminderEnabled,
   ]);
 
   const triggerTestCreditCardNotification = async () => {
@@ -1830,6 +2231,16 @@ export const ExpenseProvider = ({ children }) => {
         setLanguage,
         toggleLanguage,
         customAccounts,
+        deletedAccountIds,
+        deleteBuiltInAccount,
+        restoreBuiltInAccounts,
+        certificates,
+        addCertificate,
+        deleteCertificate,
+        creditCertificateInterestNow,
+        computeCertificatePeriodicYield,
+        bkpMoney,
+        updateBkpMoney,
         allPaymentMethods,
         getAccountById,
         addCustomAccount,

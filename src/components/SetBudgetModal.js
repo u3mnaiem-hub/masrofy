@@ -164,8 +164,8 @@ export const SetBudgetModal = ({ visible, onClose }) => {
         <View style={styles.content}>
           <View style={[styles.header, isArabic && { flexDirection: 'row-reverse' }]}>
             <View style={{ width: 36 }} />
-            <Text style={styles.title}>
-              {isArabic ? 'تعديل يدوي للشهر الجديد وأرصدة البداية' : 'Manual Edit for New Month & Balances'}
+            <Text style={styles.title} numberOfLines={2}>
+              {isArabic ? 'تعديل أرصدة البداية وتواريخ الدورة' : 'Edit Starting Balances & Cycle Dates'}
             </Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
               <MaterialCommunityIcons name="close" size={24} color={COLORS.textSecondary} />
@@ -173,50 +173,6 @@ export const SetBudgetModal = ({ visible, onClose }) => {
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.body}>
-            {/* NEW MONTH ROLLOVER CARD ("شهر جديد") */}
-            <View style={styles.newMonthCard}>
-              <View style={[styles.newMonthHeader, isArabic && { flexDirection: 'row-reverse' }]}>
-                <MaterialCommunityIcons name="calendar-refresh" size={22} color="#1E40AF" />
-                <Text style={[styles.newMonthTitle, isArabic && { textAlign: 'right' }]}>
-                  {isArabic
-                    ? 'إقفال الدورة الحالية وبدء شهر جديد تلقائياً'
-                    : 'Close Current Cycle & Start New Month'}
-                </Text>
-              </View>
-              <Text style={[styles.newMonthDesc, isArabic && { textAlign: 'right' }]}>
-                {isArabic
-                  ? `ينقل أوتوماتيكياً الكاش المتبقي (${formatAmount(balances?.availCsh || 0)} ${selectedCurrency.symbol}) وبطاقة DC (${formatAmount(balances?.availDc || 0)} ${selectedCurrency.symbol}) وإجمالي المستحق على الكروت (${formatAmount(balances?.totalCcDebt || 0)} ${selectedCurrency.symbol}) للشهر الجديد.`
-                  : `Automatically transfers remaining Cash (${formatAmount(balances?.availCsh || 0)} ${selectedCurrency.symbol}), DC (${formatAmount(balances?.availDc || 0)} ${selectedCurrency.symbol}), and Total Credit Card Dues (${formatAmount(balances?.totalCcDebt || 0)} ${selectedCurrency.symbol}) to the new month.`}
-              </Text>
-
-              <Text style={[styles.sublabel, { marginTop: 6 }, isArabic && { textAlign: 'right' }]}>
-                {isArabic
-                  ? 'إضافة راتب / إيداع جديد على حساب DC للشهر الجديد (اختياري):'
-                  : 'Optional New Salary / Deposit to add to DC for New Month:'}
-              </Text>
-              <View style={[styles.inputWrap, { backgroundColor: '#FFFFFF', marginBottom: 10 }]}>
-                <TextInput
-                  style={[styles.input, { fontSize: 16 }]}
-                  value={extraDcDeposit}
-                  onChangeText={setExtraDcDeposit}
-                  keyboardType="numeric"
-                  placeholder={isArabic ? '0 (اختياري)' : '0 (Optional)'}
-                  placeholderTextColor={COLORS.textMuted}
-                />
-              </View>
-
-              <TouchableOpacity
-                style={[styles.newMonthBtn, isArabic && { flexDirection: 'row-reverse' }]}
-                onPress={handleStartNewMonth}
-                activeOpacity={0.85}
-              >
-                <MaterialCommunityIcons name="calendar-plus" size={20} color="#FFFFFF" />
-                <Text style={styles.newMonthBtnText}>
-                  {isArabic ? 'شهر جديد (ترحيل الكاش ومستحقات الكروت)' : 'New Month (Roll Over Cash & CC Dues)'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
             {/* Auto Total Banner */}
             <View style={styles.totalBanner}>
               <Text style={styles.totalBannerLabel}>
@@ -380,9 +336,12 @@ const styles = StyleSheet.create({
     borderBottomColor: COLORS.borderLight,
   },
   title: {
-    fontSize: 16,
-    fontWeight: '700',
+    flex: 1,
+    fontSize: 15.5,
+    fontWeight: '800',
     color: COLORS.textPrimary,
+    textAlign: 'center',
+    paddingHorizontal: 8,
   },
   closeBtn: {
     padding: 6,

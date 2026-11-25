@@ -29,6 +29,7 @@ import { ExcelSheetEntryModal } from '../components/ExcelSheetEntryModal';
 import { VoiceQueryModal } from '../components/VoiceQueryModal';
 import { ManageCategoriesModal } from '../components/ManageCategoriesModal';
 import { SmartFeaturesModal } from '../components/SmartFeaturesModal';
+import { HelpAndFeaturesModal } from '../components/HelpAndFeaturesModal';
 
 export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
   const {
@@ -63,6 +64,7 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
   const [manageCategoriesVisible, setManageCategoriesVisible] = useState(false);
   const [smartModalVisible, setSmartModalVisible] = useState(false);
   const [smartModalTab, setSmartModalTab] = useState('recurring');
+  const [helpModalVisible, setHelpModalVisible] = useState(false);
   const [homeViewTrigger, setHomeViewTrigger] = useState(0);
   const [voiceSnackbarText, setVoiceSnackbarText] = useState('');
   const snackbarTimerRef = useRef(null);
@@ -152,31 +154,9 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
     setModalVisible(true);
   };
 
-  // Smart Date Check before Opening Rollover Modal
+  // Flexible Salary-Cycle Rollover (not tied to calendar day 1 — can close after 25, 30, or 37 days)
   const handleOpenRollover = () => {
-    const todayStr = new Date().toISOString().split('T')[0];
-    const isCycleEarly = balances?.cycleEndDate && todayStr < balances.cycleEndDate;
-    const daysElapsed = balances?.daysElapsed ?? 1;
-    const daysLeft = balances?.daysLeft ?? 0;
-
-    if (isCycleEarly && daysLeft > 0) {
-      Alert.alert(
-        isArabic ? '⚠️ تنبيه: الشهر الحالي لم يكتمل بعد' : '⚠️ Alert: Month Not Completed Yet',
-        isArabic
-          ? `لم يمر سوى ${daysElapsed} يوم فقط من بداية هذا الشهر (${balances?.cycleStartDate})، ومتبقي ${daysLeft} يوم حتى نهاية الدورة في (${balances?.cycleEndDate}).\n\nهل أنت متأكد أنك تريد إنهاء الشهر الحالي والترحيل لشهر جديد الآن؟`
-          : `Only ${daysElapsed} days have passed since the start of this month (${balances?.cycleStartDate}), and ${daysLeft} days remain until ${balances?.cycleEndDate}.\n\nAre you sure you want to end this month and roll over now?`,
-        [
-          { text: isArabic ? 'تراجع / إلغاء' : 'Cancel', style: 'cancel' },
-          {
-            text: isArabic ? 'نعم، متابعة الترحيل' : 'Yes, Continue Rollover',
-            style: 'destructive',
-            onPress: () => setRolloverModalVisible(true),
-          },
-        ]
-      );
-    } else {
-      setRolloverModalVisible(true);
-    }
+    setRolloverModalVisible(true);
   };
 
   // Recent 6 transactions (already sorted newest-first at the top)
@@ -202,7 +182,23 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
               </View>
             </View>
 
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              {/* Quick Help & All Features Button */}
+              <TouchableOpacity
+                style={[
+                  styles.settingsHeaderBtn,
+                  { backgroundColor: isDarkMode ? themeColors.surfaceSecondary : '#EFF6FF', borderColor: isDarkMode ? themeColors.border : '#BFDBFE' },
+                ]}
+                onPress={() => setHelpModalVisible(true)}
+                activeOpacity={0.7}
+              >
+                <MaterialCommunityIcons
+                  name="help-circle-outline"
+                  size={20}
+                  color={isDarkMode ? '#93C5FD' : '#1D4ED8'}
+                />
+              </TouchableOpacity>
+
               {/* Privacy Hide/Show Balances Eye Toggle */}
               <TouchableOpacity
                 style={[
@@ -891,6 +887,10 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
           visible={smartModalVisible}
           onClose={() => setSmartModalVisible(false)}
           initialTab={smartModalTab}
+        />
+        <HelpAndFeaturesModal
+          visible={helpModalVisible}
+          onClose={() => setHelpModalVisible(false)}
         />
       </View>
     </SafeAreaView>

@@ -20,13 +20,71 @@ import {
 } from '../utils/smartVoiceFlow';
 
 export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelSheet, onOpenPayCc, viewTrigger = 0 }) => {
-  const { balances, currency, formatAmount, isArabic, isDarkMode, isBalancesHidden, themeColors } = useExpense();
+  const { balances, currency, formatAmount, isArabic, isDarkMode, isBalancesHidden, deletedAccountIds, themeColors } = useExpense();
   const [showPlasticCards, setShowPlasticCards] = useState(true);
   const [reduceMotionEnabled, setReduceMotionEnabled] = useState(false);
   const [foregroundCycle, setForegroundCycle] = useState(0);
   const blinkAnim = useRef(new Animated.Value(1)).current;
   const grossBlinkAnim = useRef(new Animated.Value(1)).current;
   const debtBlinkAnim = useRef(new Animated.Value(1)).current;
+
+  const isDeleted = (id) => (deletedAccountIds || []).includes(id);
+
+  // Format YYYY-MM-25 -> "25/MM" dynamically (never hardcoded to 25/11 or 25/12)
+  const formatShortDue = (isoDate, fallback) => {
+    if (!isoDate || typeof isoDate !== 'string') return fallback;
+    const parts = isoDate.split('-');
+    if (parts.length !== 3) return fallback;
+    return `${parseInt(parts[2], 10)}/${parseInt(parts[1], 10)}`;
+  };
+  const thisDueLbl = formatShortDue(balances.currentMonthDueDate, '25/11');
+  const nextDueLbl = formatShortDue(balances.nextMonthDueDate, '25/12');
+
+  const formatCardDueSub = (dueThis, dueNext) => {
+    if (dueThis > 0 && dueNext > 0) {
+      return `${thisDueLbl}: ${formatAmount(dueThis)} • ${nextDueLbl}: ${formatAmount(dueNext)}`;
+    }
+    if (dueThis > 0) {
+      return isArabic ? `مستحق ${thisDueLbl}: ${formatAmount(dueThis)}` : `Due ${thisDueLbl}: ${formatAmount(dueThis)}`;
+    }
+    if (dueNext > 0) {
+      return isArabic ? `مستحق ${nextDueLbl}: ${formatAmount(dueNext)}` : `Due ${nextDueLbl}: ${formatAmount(dueNext)}`;
+    }
+    return isArabic ? `مستحق ${nextDueLbl}: ${formatAmount(0)}` : `Due ${nextDueLbl}: ${formatAmount(0)}`;
+  };
+
+  const LINKED_BADGE_MAP = {
+    current: isArabic ? 'ديبيت • جاري' : 'DEBIT • CURRENT',
+    savings: isArabic ? 'ديبيت • توفير' : 'DEBIT • SAVINGS',
+    meeza: isArabic ? 'ميزة' : 'MEEZA',
+    credit: isArabic ? 'كريديت • ائتمان' : 'CREDIT CARD',
+  };
+
+  const customDebitPlasticCards = (balances.customDebitCardsSummary || []).map((d) => ({
+    id: d.id,
+    title: d.bankName,
+    typeBadge: LINKED_BADGE_MAP[d.linkedAccountType || 'current'] || 'DEBIT CARD',
+    digits: '4000 •••• BANK',
+    amount: d.avail,
+    subText: isArabic ? `بداية الشهر: ${formatAmount(d.startBal)}` : `Start: ${formatAmount(d.startBal)}`,
+    ratio: d.startBal > 0 ? Math.min(100, Math.max(0, Math.round(((d.startBal - d.avail) / d.startBal) * 100))) : 0,
+    bg: '#1E40AF',
+    accent: '#93C5FD',
+    isCredit: false,
+  }));
+
+  const customCreditPlasticCards = (balances.customCreditCardsSummary || []).map((c) => ({
+    id: c.id,
+    title: c.bankName,
+    typeBadge: LINKED_BADGE_MAP[c.linkedAccountType || 'credit'] || 'CREDIT CARD',
+    digits: '5200 •••• CARD',
+    amount: c.totalDebt,
+    subText: formatCardDueSub(c.dueThisMonth, c.dueNextMonth),
+    ratio: Math.min(100, Math.round(((c.totalDebt || 0) / 10000) * 100)),
+    bg: '#4C1D95',
+    accent: '#C4B5FD',
+    isCredit: true,
+  }));
 
   const bankCardsList = [
     {
@@ -42,43 +100,57 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
       isCredit: false,
       isWallet: true,
     },
-    {
-      id: 'dc',
-      title: isArabic ? 'DC / حساب بنكي' : 'DC Bank Account',
-      typeBadge: 'DEBIT CARD',
-      digits: '4532 •••• 8821',
-      amount: balances.availDc,
-      subText: isArabic ? `بداية الشهر: ${formatAmount(balances.startDc)}` : `Start: ${formatAmount(balances.startDc)}`,
-      ratio: balances.startDc > 0 ? Math.min(100, Math.max(0, Math.round(((balances.startDc - balances.availDc) / balances.startDc) * 100))) : 0,
-      bg: '#1E3A8A',
-      accent: '#60A5FA',
-      isCredit: false,
-    },
-    {
-      id: 'cc_ar',
-      title: isArabic ? 'البنك العربي (CC AR)' : 'Arab Bank (CC AR)',
-      typeBadge: 'CREDIT CARD',
-      digits: '5412 •••• 3910',
-      amount: balances.ccArDebt,
-      subText: isArabic ? `مستحق 25/11: ${formatAmount(balances.ccArDueThisMonth)}` : `Due 25/11: ${formatAmount(balances.ccArDueThisMonth)}`,
-      ratio: Math.min(100, Math.round(((balances.ccArDebt || 0) / 10000) * 100)),
-      bg: '#7DD3FC',
-      accent: '#0369A1',
-      isLightCard: true,
-      isCredit: true,
-    },
-    {
-      id: 'cc_ca',
-      title: isArabic ? 'كريدي أجريكول (CC CA)' : 'Crédit Agricole',
-      typeBadge: 'CREDIT CARD',
-      digits: '4916 •••• 7742',
-      amount: balances.ccCaDebt,
-      subText: isArabic ? `مستحق 25/12: ${formatAmount(balances.ccCaDueNextMonth)}` : `Due 25/12: ${formatAmount(balances.ccCaDueNextMonth)}`,
-      ratio: Math.min(100, Math.round(((balances.ccCaDebt || 0) / 10000) * 100)),
-      bg: '#064E3B',
-      accent: '#34D399',
-      isCredit: true,
-    },
+    ...(!isDeleted('dc')
+      ? [
+          {
+            id: 'dc',
+            title: isArabic ? 'DC / حساب بنكي' : 'DC Bank Account',
+            typeBadge: isArabic ? 'ديبيت • جاري' : 'DEBIT CARD',
+            digits: '4532 •••• 8821',
+            amount: balances.availDc,
+            subText: isArabic ? `بداية الشهر: ${formatAmount(balances.startDc)}` : `Start: ${formatAmount(balances.startDc)}`,
+            ratio: balances.startDc > 0 ? Math.min(100, Math.max(0, Math.round(((balances.startDc - balances.availDc) / balances.startDc) * 100))) : 0,
+            bg: '#1E3A8A',
+            accent: '#60A5FA',
+            isCredit: false,
+          },
+        ]
+      : []),
+    ...(!isDeleted('cc_ar')
+      ? [
+          {
+            id: 'cc_ar',
+            title: isArabic ? 'البنك العربي (CC AR)' : 'Arab Bank (CC AR)',
+            typeBadge: isArabic ? 'كريديت • ائتمان' : 'CREDIT CARD',
+            digits: '5412 •••• 3910',
+            amount: balances.ccArDebt,
+            subText: formatCardDueSub(balances.ccArDueThisMonth, balances.ccArDueNextMonth),
+            ratio: Math.min(100, Math.round(((balances.ccArDebt || 0) / 10000) * 100)),
+            bg: '#7DD3FC',
+            accent: '#0369A1',
+            isLightCard: true,
+            isCredit: true,
+          },
+        ]
+      : []),
+    ...(!isDeleted('cc_ca')
+      ? [
+          {
+            id: 'cc_ca',
+            title: isArabic ? 'كريدي أجريكول (CC CA)' : 'Crédit Agricole',
+            typeBadge: isArabic ? 'كريديت • ائتمان' : 'CREDIT CARD',
+            digits: '4916 •••• 7742',
+            amount: balances.ccCaDebt,
+            subText: formatCardDueSub(balances.ccCaDueThisMonth, balances.ccCaDueNextMonth),
+            ratio: Math.min(100, Math.round(((balances.ccCaDebt || 0) / 10000) * 100)),
+            bg: '#064E3B',
+            accent: '#34D399',
+            isCredit: true,
+          },
+        ]
+      : []),
+    ...customDebitPlasticCards,
+    ...customCreditPlasticCards,
   ];
 
   // Monthly Consumption Percentage calculation (Outflow / Starting Base)
@@ -117,7 +189,7 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
     return () => appStateSub?.remove?.();
   }, []);
 
-  // Smooth fade pulse for ~5 seconds (BUDGET_BLINK_DURATION_MS) when > 75%, then settle to static highlighted state
+  // Smooth blink 20 times when > 75%, then settle to static highlighted state
   useEffect(() => {
     blinkAnim.stopAnimation();
     blinkAnim.setValue(1);
@@ -128,31 +200,23 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
 
     const pulseCycle = Animated.sequence([
       Animated.timing(blinkAnim, {
-        toValue: 0.35,
-        duration: 500,
+        toValue: 0.25,
+        duration: 300,
         useNativeDriver: true,
       }),
       Animated.timing(blinkAnim, {
         toValue: 1,
-        duration: 500,
+        duration: 300,
         useNativeDriver: true,
       }),
     ]);
 
-    const loop = Animated.loop(pulseCycle);
-    loop.start();
-
-    const stopTimer = setTimeout(() => {
-      loop.stop();
-      Animated.timing(blinkAnim, {
-        toValue: 1,
-        duration: 220,
-        useNativeDriver: true,
-      }).start();
-    }, BUDGET_BLINK_DURATION_MS);
+    const loop = Animated.loop(pulseCycle, { iterations: 20 });
+    loop.start(() => {
+      blinkAnim.setValue(1);
+    });
 
     return () => {
-      clearTimeout(stopTimer);
       loop.stop();
       blinkAnim.setValue(1);
     };
@@ -174,7 +238,7 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
     return `${flooredK.toFixed(1)}K`;
   };
 
-  // Blink Gross Available 10 times on startup/foreground if < 15,000 (even 14.99k), then stay solid
+  // Blink Gross Available 20 times on startup/foreground if < 15,000 (even 14.99k), then stay solid
   const isGrossLow = grossAvailableBeforeCards < 15000;
   useEffect(() => {
     grossBlinkAnim.stopAnimation();
@@ -185,7 +249,7 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
       Animated.timing(grossBlinkAnim, { toValue: 0.15, duration: 280, useNativeDriver: true }),
       Animated.timing(grossBlinkAnim, { toValue: 1, duration: 280, useNativeDriver: true }),
     ]);
-    const loop = Animated.loop(singleBlink, { iterations: 10 });
+    const loop = Animated.loop(singleBlink, { iterations: 20 });
     loop.start(() => {
       grossBlinkAnim.setValue(1);
     });
@@ -195,7 +259,7 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
     };
   }, [isGrossLow, reduceMotionEnabled, foregroundCycle, grossBlinkAnim]);
 
-  // Blink Card Debts 5 times on startup/foreground if > 3,500, then stay solid
+  // Blink Card Debts 20 times on startup/foreground if > 3,500, then stay solid
   const isDebtHigh = totalCcDebtValue > 3500;
   useEffect(() => {
     debtBlinkAnim.stopAnimation();
@@ -206,7 +270,7 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
       Animated.timing(debtBlinkAnim, { toValue: 0.15, duration: 300, useNativeDriver: true }),
       Animated.timing(debtBlinkAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
     ]);
-    const loop = Animated.loop(singleBlink, { iterations: 5 });
+    const loop = Animated.loop(singleBlink, { iterations: 20 });
     loop.start(() => {
       debtBlinkAnim.setValue(1);
     });
@@ -563,112 +627,112 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
           </View>
 
           {/* Block 2: DC / حساب بنكي */}
-          <View style={[styles.accountCard, styles.beigeCard, isDarkMode && styles.darkBeigeCard, { flex: 1 }, isArabic && { alignItems: 'flex-end' }]}>
-            <View style={[styles.accountTop, isArabic && { flexDirection: 'row-reverse' }]}>
+          {!isDeleted('dc') && (
+            <View style={[styles.accountCard, styles.beigeCard, isDarkMode && styles.darkBeigeCard, { flex: 1 }, isArabic && { alignItems: 'flex-end' }]}>
+              <View style={[styles.accountTop, isArabic && { flexDirection: 'row-reverse' }]}>
+                <Text
+                  style={[styles.accountName, styles.beigeText, isDarkMode && styles.darkBeigeText, isArabic && { textAlign: 'right' }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit={true}
+                  minimumFontScale={0.75}
+                >
+                  {isArabic ? 'DC / حساب بنكي' : 'DC / Bank'}
+                </Text>
+                <MaterialCommunityIcons name="credit-card" size={15} color={isDarkMode ? '#D9B872' : '#B45309'} />
+              </View>
+              <Text style={[styles.accountAmount, styles.beigeText, isDarkMode && styles.darkBeigeText]} numberOfLines={1}>
+                {formatAmount(balances.availDc)} {currency.symbol}
+              </Text>
               <Text
-                style={[styles.accountName, styles.beigeText, isDarkMode && styles.darkBeigeText, isArabic && { textAlign: 'right' }]}
+                style={[styles.accountSub, styles.beigeSubText, isDarkMode && styles.darkBeigeSubText]}
                 numberOfLines={1}
                 adjustsFontSizeToFit={true}
                 minimumFontScale={0.75}
               >
-                {isArabic ? 'DC / حساب بنكي' : 'DC / Bank'}
+                {isArabic ? `بدأنا بـ ${formatAmount(balances.startDc)}` : `Start ${formatAmount(balances.startDc)}`}
               </Text>
-              <MaterialCommunityIcons name="credit-card" size={15} color={isDarkMode ? '#D9B872' : '#B45309'} />
             </View>
-            <Text style={[styles.accountAmount, styles.beigeText, isDarkMode && styles.darkBeigeText]} numberOfLines={1}>
-              {formatAmount(balances.availDc)} {currency.symbol}
-            </Text>
-            <Text
-              style={[styles.accountSub, styles.beigeSubText, isDarkMode && styles.darkBeigeSubText]}
-              numberOfLines={1}
-              adjustsFontSizeToFit={true}
-              minimumFontScale={0.75}
-            >
-              {isArabic ? `بدأنا بـ ${formatAmount(balances.startDc)}` : `Start ${formatAmount(balances.startDc)}`}
-            </Text>
-          </View>
+          )}
         </View>
 
         {/* Row 2: أجريكول والعربي جنباً إلى جنب تحتهما مباشرة */}
-        <View style={[styles.blocksPairRow, isArabic && { flexDirection: 'row-reverse' }]}>
-          {/* Block 3: كريدي أجريكول (CC CA) */}
-          <TouchableOpacity
-            style={[styles.accountCard, styles.greenCaCard, isDarkMode && styles.darkGreenCaCard, { flex: 1 }, isArabic && { alignItems: 'flex-end' }]}
-            onPress={() => onOpenPayCc && onOpenPayCc('cc_ca')}
-            activeOpacity={0.75}
-          >
-            <View style={[styles.accountTop, isArabic && { flexDirection: 'row-reverse' }]}>
-              <Text
-                style={[styles.accountName, styles.greenCaText, isDarkMode && styles.darkGreenCaText, isArabic && { textAlign: 'right' }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit={true}
-                minimumFontScale={0.75}
+        {(!isDeleted('cc_ca') || !isDeleted('cc_ar')) && (
+          <View style={[styles.blocksPairRow, isArabic && { flexDirection: 'row-reverse' }]}>
+            {/* Block 3: كريدي أجريكول (CC CA) */}
+            {!isDeleted('cc_ca') && (
+              <TouchableOpacity
+                style={[styles.accountCard, styles.greenCaCard, isDarkMode && styles.darkGreenCaCard, { flex: 1 }, isArabic && { alignItems: 'flex-end' }]}
+                onPress={() => onOpenPayCc && onOpenPayCc('cc_ca')}
+                activeOpacity={0.75}
               >
-                {isArabic ? 'أجريكول (CC CA)' : 'Crédit Agricole'}
-              </Text>
-              <View style={[styles.payBadgeRow, isArabic && { flexDirection: 'row-reverse' }]}>
-                <View style={[styles.payBadgeGreen, isDarkMode && { backgroundColor: '#2E4C3E' }]}>
-                  <Text style={[styles.payBadgeGreenText, isDarkMode && { color: '#9EE0BE' }]}>{isArabic ? 'سداد 💳' : 'Pay'}</Text>
+                <View style={[styles.accountTop, isArabic && { flexDirection: 'row-reverse' }]}>
+                  <Text
+                    style={[styles.accountName, styles.greenCaText, isDarkMode && styles.darkGreenCaText, isArabic && { textAlign: 'right' }]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit={true}
+                    minimumFontScale={0.75}
+                  >
+                    {isArabic ? 'أجريكول (CC CA)' : 'Crédit Agricole'}
+                  </Text>
+                  <View style={[styles.payBadgeRow, isArabic && { flexDirection: 'row-reverse' }]}>
+                    <View style={[styles.payBadgeGreen, isDarkMode && { backgroundColor: '#2E4C3E' }]}>
+                      <Text style={[styles.payBadgeGreenText, isDarkMode && { color: '#9EE0BE' }]}>{isArabic ? 'سداد 💳' : 'Pay'}</Text>
+                    </View>
+                    <MaterialCommunityIcons name="credit-card-outline" size={14} color={isDarkMode ? '#8ED6B3' : '#065F46'} />
+                  </View>
                 </View>
-                <MaterialCommunityIcons name="credit-card-outline" size={14} color={isDarkMode ? '#8ED6B3' : '#065F46'} />
-              </View>
-            </View>
-            <Text style={[styles.accountAmount, styles.greenCaText, isDarkMode && styles.darkGreenCaText]} numberOfLines={1}>
-              {formatAmount(balances.ccCaDebt)} {currency.symbol}
-            </Text>
-            <Text
-              style={[styles.accountSub, styles.greenCaSubText, isDarkMode && styles.darkGreenCaSubText]}
-              numberOfLines={1}
-              adjustsFontSizeToFit={true}
-              minimumFontScale={0.75}
-            >
-              {balances.ccCaDueThisMonth > 0
-                ? `25/11: ${formatAmount(balances.ccCaDueThisMonth)} • 25/12: ${formatAmount(balances.ccCaDueNextMonth)}`
-                : isArabic
-                ? `مستحق 25/12: ${formatAmount(balances.ccCaDueNextMonth)}`
-                : `Due 25/12: ${formatAmount(balances.ccCaDueNextMonth)}`}
-            </Text>
-          </TouchableOpacity>
+                <Text style={[styles.accountAmount, styles.greenCaText, isDarkMode && styles.darkGreenCaText]} numberOfLines={1}>
+                  {formatAmount(balances.ccCaDebt)} {currency.symbol}
+                </Text>
+                <Text
+                  style={[styles.accountSub, styles.greenCaSubText, isDarkMode && styles.darkGreenCaSubText]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit={true}
+                  minimumFontScale={0.75}
+                >
+                  {formatCardDueSub(balances.ccCaDueThisMonth, balances.ccCaDueNextMonth)}
+                </Text>
+              </TouchableOpacity>
+            )}
 
-          {/* Block 4: البنك العربي (CC AR) */}
-          <TouchableOpacity
-            style={[styles.accountCard, styles.blueArCard, isDarkMode && styles.darkBlueArCard, { flex: 1 }, isArabic && { alignItems: 'flex-end' }]}
-            onPress={() => onOpenPayCc && onOpenPayCc('cc_ar')}
-            activeOpacity={0.75}
-          >
-            <View style={[styles.accountTop, isArabic && { flexDirection: 'row-reverse' }]}>
-              <Text
-                style={[styles.accountName, styles.blueArText, isDarkMode && styles.darkBlueArText, isArabic && { textAlign: 'right' }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit={true}
-                minimumFontScale={0.75}
+            {/* Block 4: البنك العربي (CC AR) */}
+            {!isDeleted('cc_ar') && (
+              <TouchableOpacity
+                style={[styles.accountCard, styles.blueArCard, isDarkMode && styles.darkBlueArCard, { flex: 1 }, isArabic && { alignItems: 'flex-end' }]}
+                onPress={() => onOpenPayCc && onOpenPayCc('cc_ar')}
+                activeOpacity={0.75}
               >
-                {isArabic ? 'العربي (CC AR)' : 'Arab Bank (CC)'}
-              </Text>
-              <View style={[styles.payBadgeRow, isArabic && { flexDirection: 'row-reverse' }]}>
-                <View style={[styles.payBadgeBlue, isDarkMode && { backgroundColor: '#314460' }]}>
-                  <Text style={[styles.payBadgeBlueText, isDarkMode && { color: '#A5C8F5' }]}>{isArabic ? 'سداد 💳' : 'Pay'}</Text>
+                <View style={[styles.accountTop, isArabic && { flexDirection: 'row-reverse' }]}>
+                  <Text
+                    style={[styles.accountName, styles.blueArText, isDarkMode && styles.darkBlueArText, isArabic && { textAlign: 'right' }]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit={true}
+                    minimumFontScale={0.75}
+                  >
+                    {isArabic ? 'العربي (CC AR)' : 'Arab Bank (CC)'}
+                  </Text>
+                  <View style={[styles.payBadgeRow, isArabic && { flexDirection: 'row-reverse' }]}>
+                    <View style={[styles.payBadgeBlue, isDarkMode && { backgroundColor: '#314460' }]}>
+                      <Text style={[styles.payBadgeBlueText, isDarkMode && { color: '#A5C8F5' }]}>{isArabic ? 'سداد 💳' : 'Pay'}</Text>
+                    </View>
+                    <MaterialCommunityIcons name="credit-card-clock" size={14} color={isDarkMode ? '#93BCEF' : '#1E40AF'} />
+                  </View>
                 </View>
-                <MaterialCommunityIcons name="credit-card-clock" size={14} color={isDarkMode ? '#93BCEF' : '#1E40AF'} />
-              </View>
-            </View>
-            <Text style={[styles.accountAmount, styles.blueArText, isDarkMode && styles.darkBlueArText]} numberOfLines={1}>
-              {formatAmount(balances.ccArDebt)} {currency.symbol}
-            </Text>
-            <Text
-              style={[styles.accountSub, styles.blueArSubText, isDarkMode && styles.darkBlueArSubText]}
-              numberOfLines={1}
-              adjustsFontSizeToFit={true}
-              minimumFontScale={0.75}
-            >
-              {balances.ccArDueNextMonth > 0
-                ? `25/11: ${formatAmount(balances.ccArDueThisMonth)} • 25/12: ${formatAmount(balances.ccArDueNextMonth)}`
-                : isArabic
-                ? `مستحق 25/11: ${formatAmount(balances.ccArDueThisMonth)}`
-                : `Due 25/11: ${formatAmount(balances.ccArDueThisMonth)}`}
-            </Text>
-          </TouchableOpacity>
-        </View>
+                <Text style={[styles.accountAmount, styles.blueArText, isDarkMode && styles.darkBlueArText]} numberOfLines={1}>
+                  {formatAmount(balances.ccArDebt)} {currency.symbol}
+                </Text>
+                <Text
+                  style={[styles.accountSub, styles.blueArSubText, isDarkMode && styles.darkBlueArSubText]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit={true}
+                  minimumFontScale={0.75}
+                >
+                  {formatCardDueSub(balances.ccArDueThisMonth, balances.ccArDueNextMonth)}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         {/* Custom Debit Cards Pairs */}
         {(balances.customDebitCardsSummary || []).length > 0 && (
@@ -677,7 +741,7 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
               <View key={dCard.id} style={[styles.accountCard, styles.blueArCard, isDarkMode && styles.darkBlueArCard, { flex: 1 }, isArabic && { alignItems: 'flex-end' }]}>
                 <View style={[styles.accountTop, isArabic && { flexDirection: 'row-reverse' }]}>
                   <Text style={[styles.accountName, styles.blueArText, isDarkMode && styles.darkBlueArText, isArabic && { textAlign: 'right' }]} numberOfLines={1}>
-                    {dCard.bankName} (DC)
+                    {dCard.bankName}
                   </Text>
                   <MaterialCommunityIcons name="credit-card-outline" size={15} color={isDarkMode ? '#93BCEF' : '#1E40AF'} />
                 </View>
@@ -704,7 +768,7 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
               >
                 <View style={[styles.accountTop, isArabic && { flexDirection: 'row-reverse' }]}>
                   <Text style={[styles.accountName, styles.greenCaText, isDarkMode && styles.darkGreenCaText, isArabic && { textAlign: 'right' }]} numberOfLines={1}>
-                    {cCard.bankName} (CC)
+                    {cCard.bankName}
                   </Text>
                   <View style={[styles.payBadgeRow, isArabic && { flexDirection: 'row-reverse' }]}>
                     <View style={[styles.payBadgeGreen, isDarkMode && { backgroundColor: '#2E4C3E' }]}>
@@ -717,11 +781,7 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
                   {formatAmount(cCard.totalDebt)} {currency.symbol}
                 </Text>
                 <Text style={[styles.accountSub, styles.greenCaSubText, isDarkMode && styles.darkGreenCaSubText]} numberOfLines={1}>
-                  {cCard.dueThisMonth > 0
-                    ? `25/11: ${formatAmount(cCard.dueThisMonth)} • 25/12: ${formatAmount(cCard.dueNextMonth)}`
-                    : isArabic
-                    ? `مستحق 25/12: ${formatAmount(cCard.dueNextMonth)}`
-                    : `Due 25/12: ${formatAmount(cCard.dueNextMonth)}`}
+                  {formatCardDueSub(cCard.dueThisMonth, cCard.dueNextMonth)}
                 </Text>
               </TouchableOpacity>
             ))}

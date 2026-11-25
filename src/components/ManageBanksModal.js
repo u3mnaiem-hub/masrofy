@@ -13,20 +13,41 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS } from '../constants/theme';
 import { useExpense } from '../context/ExpenseContext';
 
+const LINKED_ACCOUNT_TYPES = [
+  { id: 'current', labelAr: 'جاري', labelEn: 'Current', icon: 'bank-outline' },
+  { id: 'savings', labelAr: 'توفير', labelEn: 'Savings', icon: 'piggy-bank-outline' },
+  { id: 'meeza', labelAr: 'ميزة', labelEn: 'Meeza', icon: 'card-account-details-outline' },
+  { id: 'credit', labelAr: 'ائتمان', labelEn: 'Credit', icon: 'credit-card-clock-outline' },
+];
+
 export const ManageBanksModal = ({ visible, onClose }) => {
   const {
     customAccounts,
+    deletedAccountIds,
+    balances,
     addCustomAccount,
     deleteCustomAccount,
+    deleteBuiltInAccount,
+    restoreBuiltInAccounts,
     currency,
     formatAmount,
     isArabic,
   } = useExpense();
 
-  const [accountType, setAccountType] = useState('credit'); // 'credit' | 'debit'
+  const [accountType, setAccountType] = useState('debit'); // 'debit' | 'credit'
+  const [linkedAccountType, setLinkedAccountType] = useState('current'); // 'current' | 'savings' | 'meeza' | 'credit'
   const [bankName, setBankName] = useState('');
   const [startingBalance, setStartingBalance] = useState('');
   const [carryOver, setCarryOver] = useState('');
+
+  const handleSelectCardType = (type) => {
+    setAccountType(type);
+    if (type === 'credit') {
+      setLinkedAccountType('credit');
+    } else if (linkedAccountType === 'credit') {
+      setLinkedAccountType('current');
+    }
+  };
 
   const handleAdd = async () => {
     const cleanName = bankName.trim();
@@ -34,8 +55,8 @@ export const ManageBanksModal = ({ visible, onClose }) => {
       Alert.alert(
         isArabic ? 'أدخل اسم البنك' : 'Enter Bank Name',
         isArabic
-          ? 'يرجى كتابة اسم البنك أو البطاقة (مثل CIB، الأهلي، QNB...).'
-          : 'Please enter the bank or card name (e.g., CIB, NBE, QNB, HSBC...).'
+          ? 'يرجى كتابة اسم البنك أو البطاقة (مثل CIB، الأهلي، بنك مصر، QNB...).'
+          : 'Please enter the bank or card name (e.g., CIB, NBE, Banque Misr, QNB...).'
       );
       return;
     }
@@ -43,6 +64,7 @@ export const ManageBanksModal = ({ visible, onClose }) => {
     await addCustomAccount({
       bankName: cleanName,
       accountType,
+      linkedAccountType,
       startingBalance: accountType === 'debit' ? parseFloat(startingBalance) || 0 : 0,
       carryOverDueThisMonth: accountType === 'credit' ? parseFloat(carryOver) || 0 : 0,
     });
@@ -52,12 +74,12 @@ export const ManageBanksModal = ({ visible, onClose }) => {
     setCarryOver('');
   };
 
-  const handleDelete = (acc) => {
+  const handleDeleteCustom = (acc) => {
     Alert.alert(
       isArabic ? 'حذف البطاقة / البنك' : 'Delete Bank / Card',
       isArabic
-        ? `هل تريد حذف "${acc.bankName}" من قائمة البطاقات؟`
-        : `Remove "${acc.bankName}" from your cards list?`,
+        ? `هل تريد حذف "${acc.bankName}" من قائمة البطاقات الأساسية؟`
+        : `Remove "${acc.bankName}" from your primary cards list?`,
       [
         { text: isArabic ? 'إلغاء' : 'Cancel', style: 'cancel' },
         {
@@ -68,6 +90,62 @@ export const ManageBanksModal = ({ visible, onClose }) => {
       ]
     );
   };
+
+  const handleDeleteBuiltIn = (card) => {
+    Alert.alert(
+      isArabic ? 'حذف كارت بنكي أساسي' : 'Delete Primary Bank Card',
+      isArabic
+        ? `هل تريد حذف "${card.title}" نهائياً من الشاشة الرئيسية وطرق الدفع؟ (يمكنك استعادته لاحقاً من نفس الشاشة)`
+        : `Remove "${card.title}" from the home screen and payment methods? (You can restore it anytime here)`,
+      [
+        { text: isArabic ? 'إلغاء' : 'Cancel', style: 'cancel' },
+        {
+          text: isArabic ? 'نعم، حذف' : 'Yes, Delete',
+          style: 'destructive',
+          onPress: () => deleteBuiltInAccount(card.id),
+        },
+      ]
+    );
+  };
+
+  const getLinkedLabel = (key) => {
+    const found = LINKED_ACCOUNT_TYPES.find((t) => t.id === key);
+    if (!found) return isArabic ? 'جاري' : 'Current';
+    return isArabic ? found.labelAr : found.labelEn;
+  };
+
+  // Active built-in bank cards (excluding Cash wallet which stays as cash pocket)
+  const builtInBankCards = [
+    {
+      id: 'dc',
+      title: isArabic ? 'DC / حساب بنكي (أساسي)' : 'DC / Bank Account (Default)',
+      isCredit: false,
+      linkedLabel: isArabic ? 'جاري' : 'Current',
+      subText: isArabic
+        ? `ديبيت • جاري • رصيد متاح: ${formatAmount(balances?.availDc || 0)} ${currency.symbol}`
+        : `Debit • Current • Avail: ${formatAmount(balances?.availDc || 0)} ${currency.symbol}`,
+    },
+    {
+      id: 'cc_ar',
+      title: isArabic ? 'البنك العربي (CC AR)' : 'Arab Bank (CC AR)',
+      isCredit: true,
+      linkedLabel: isArabic ? 'ائتمان' : 'Credit',
+      subText: isArabic
+        ? `كريديت • ائتمان • مديونية: ${formatAmount(balances?.ccArDebt || 0)} ${currency.symbol}`
+        : `Credit • Debt: ${formatAmount(balances?.ccArDebt || 0)} ${currency.symbol}`,
+    },
+    {
+      id: 'cc_ca',
+      title: isArabic ? 'كريدي أجريكول (CC CA)' : 'Crédit Agricole (CC CA)',
+      isCredit: true,
+      linkedLabel: isArabic ? 'ائتمان' : 'Credit',
+      subText: isArabic
+        ? `كريديت • ائتمان • مديونية: ${formatAmount(balances?.ccCaDebt || 0)} ${currency.symbol}`
+        : `Credit • Debt: ${formatAmount(balances?.ccCaDebt || 0)} ${currency.symbol}`,
+    },
+  ].filter((c) => !(deletedAccountIds || []).includes(c.id));
+
+  const totalCardsCount = builtInBankCards.length + (customAccounts || []).length;
 
   return (
     <Modal
@@ -81,7 +159,7 @@ export const ManageBanksModal = ({ visible, onClose }) => {
           <View style={[styles.header, isArabic && { flexDirection: 'row-reverse' }]}>
             <View style={{ width: 36 }} />
             <Text style={styles.title}>
-              {isArabic ? 'إدارة البنوك والكروت الجديدة 🏦' : 'Manage Banks & Cards 🏦'}
+              {isArabic ? 'إدارة البنوك والكروت الأساسية 🏦' : 'Manage Banks & Primary Cards 🏦'}
             </Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
               <MaterialCommunityIcons name="close" size={24} color={COLORS.textSecondary} />
@@ -89,41 +167,18 @@ export const ManageBanksModal = ({ visible, onClose }) => {
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.body}>
-            {/* Card Type Selector */}
+            {/* 1. Card Type Selector: Debit vs Credit */}
             <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>
-              {isArabic ? 'نوع البطاقة المراد إضافتها' : 'Select Card / Account Type'}
+              {isArabic ? '1. نوع الكارت (ديبيت أو كريديت)' : '1. Card Type (Debit or Credit)'}
             </Text>
             <View style={[styles.typeRow, isArabic && { flexDirection: 'row-reverse' }]}>
-              <TouchableOpacity
-                style={[
-                  styles.typeBtn,
-                  accountType === 'credit' && styles.typeBtnCreditActive,
-                  isArabic && { flexDirection: 'row-reverse' },
-                ]}
-                onPress={() => setAccountType('credit')}
-              >
-                <MaterialCommunityIcons
-                  name="credit-card-clock-outline"
-                  size={18}
-                  color={accountType === 'credit' ? '#FFFFFF' : COLORS.textSecondary}
-                />
-                <Text
-                  style={[
-                    styles.typeBtnText,
-                    accountType === 'credit' && styles.typeBtnTextActive,
-                  ]}
-                >
-                  {isArabic ? 'كارت ائتمان (Credit Card)' : 'Credit Card (CC)'}
-                </Text>
-              </TouchableOpacity>
-
               <TouchableOpacity
                 style={[
                   styles.typeBtn,
                   accountType === 'debit' && styles.typeBtnDebitActive,
                   isArabic && { flexDirection: 'row-reverse' },
                 ]}
-                onPress={() => setAccountType('debit')}
+                onPress={() => handleSelectCardType('debit')}
               >
                 <MaterialCommunityIcons
                   name="credit-card-outline"
@@ -136,14 +191,68 @@ export const ManageBanksModal = ({ visible, onClose }) => {
                     accountType === 'debit' && styles.typeBtnTextActive,
                   ]}
                 >
-                  {isArabic ? 'DC / حساب بنكي' : 'DC / Bank Account'}
+                  {isArabic ? 'ديبيت (Debit)' : 'Debit Card'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.typeBtn,
+                  accountType === 'credit' && styles.typeBtnCreditActive,
+                  isArabic && { flexDirection: 'row-reverse' },
+                ]}
+                onPress={() => handleSelectCardType('credit')}
+              >
+                <MaterialCommunityIcons
+                  name="credit-card-clock-outline"
+                  size={18}
+                  color={accountType === 'credit' ? '#FFFFFF' : COLORS.textSecondary}
+                />
+                <Text
+                  style={[
+                    styles.typeBtnText,
+                    accountType === 'credit' && styles.typeBtnTextActive,
+                  ]}
+                >
+                  {isArabic ? 'كريديت (Credit)' : 'Credit Card'}
                 </Text>
               </TouchableOpacity>
             </View>
 
-            {/* Bank Name Input */}
+            {/* 2. Linked Account Type: Current, Savings, Meeza, Credit */}
             <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>
-              {isArabic ? 'اسم البنك / البطاقة (بأي اسم تريده)' : 'Bank / Card Name (Custom Name)'}
+              {isArabic ? '2. نوع الحساب المربوط بالكارت' : '2. Linked Account Type'}
+            </Text>
+            <View style={[styles.linkedRow, isArabic && { flexDirection: 'row-reverse' }]}>
+              {LINKED_ACCOUNT_TYPES.map((lt) => {
+                const isActive = linkedAccountType === lt.id;
+                return (
+                  <TouchableOpacity
+                    key={lt.id}
+                    style={[
+                      styles.linkedChip,
+                      isActive && styles.linkedChipActive,
+                      isArabic && { flexDirection: 'row-reverse' },
+                    ]}
+                    onPress={() => setLinkedAccountType(lt.id)}
+                    activeOpacity={0.8}
+                  >
+                    <MaterialCommunityIcons
+                      name={lt.icon}
+                      size={14}
+                      color={isActive ? '#FFFFFF' : COLORS.textSecondary}
+                    />
+                    <Text style={[styles.linkedChipText, isActive && styles.linkedChipTextActive]}>
+                      {isArabic ? lt.labelAr : lt.labelEn}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* 3. Bank Name Input */}
+            <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>
+              {isArabic ? '3. اسم البنك الذي ينتمي إليه الكارت' : '3. Bank Name'}
             </Text>
             <TextInput
               style={[styles.textInput, isArabic && { textAlign: 'right' }]}
@@ -151,19 +260,19 @@ export const ManageBanksModal = ({ visible, onClose }) => {
               onChangeText={setBankName}
               placeholder={
                 isArabic
-                  ? 'مثال: بنك CIB، البنك الأهلي، QNB، HSBC...'
-                  : 'e.g. CIB, NBE, QNB, HSBC, Banque Misr...'
+                  ? 'مثال: بنك CIB، البنك الأهلي، بنك مصر، QNB، HSBC...'
+                  : 'e.g. CIB, NBE, Banque Misr, QNB, HSBC...'
               }
               placeholderTextColor={COLORS.textMuted}
             />
 
-            {/* Optional Starting Balance or Carry-over */}
+            {/* 4. Starting Balance or Carry-over */}
             {accountType === 'debit' ? (
               <>
                 <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>
                   {isArabic
-                    ? `الرصيد الافتتاحي المتاح بالبطاقة (${currency.symbol})`
-                    : `Starting Available Balance (${currency.symbol})`}
+                    ? `4. الرصيد الافتتاحي المتاح (${currency.symbol})`
+                    : `4. Starting Available Balance (${currency.symbol})`}
                 </Text>
                 <TextInput
                   style={[styles.textInput, isArabic && { textAlign: 'right' }]}
@@ -178,8 +287,8 @@ export const ManageBanksModal = ({ visible, onClose }) => {
               <>
                 <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>
                   {isArabic
-                    ? `مديونية سابقة مستحقة يوم 25 هذا الشهر (اختياري - ${currency.symbol})`
-                    : `Prior Unpaid Balance Due 25th This Month (Optional - ${currency.symbol})`}
+                    ? `4. مديونية حالية مستحقة (اختياري - ${currency.symbol})`
+                    : `4. Current Unpaid Balance Due (Optional - ${currency.symbol})`}
                 </Text>
                 <TextInput
                   style={[styles.textInput, isArabic && { textAlign: 'right' }]}
@@ -191,8 +300,8 @@ export const ManageBanksModal = ({ visible, onClose }) => {
                 />
                 <Text style={[styles.hintText, isArabic && { textAlign: 'right' }]}>
                   {isArabic
-                    ? '💡 أي مشتريات جديدة بهذا الكارت ستُحسب تلقائياً بفترة سماح وتستحق يوم 25 من الشهر التالي.'
-                    : '💡 New purchases on this Credit Card automatically get a grace period until the 25th of the following month.'}
+                    ? '💡 سيظهر هذا الكارت كبطاقة أساسية في الشاشة الرئيسية وطرق الدفع، ومشترياته تستحق يوم 25 من الشهر الميلادي التالي.'
+                    : '💡 This card will appear as a primary bank card on the Home screen and payment methods, due on the 25th of the following calendar month.'}
                 </Text>
               </>
             )}
@@ -200,66 +309,106 @@ export const ManageBanksModal = ({ visible, onClose }) => {
             <TouchableOpacity style={styles.addBtn} onPress={handleAdd} activeOpacity={0.85}>
               <MaterialCommunityIcons name="plus-circle-outline" size={20} color="#FFFFFF" />
               <Text style={styles.addBtnText}>
-                {isArabic ? 'إضافة البنك / البطاقة الآن' : 'Add Bank / Card Now'}
+                {isArabic ? 'إضافة الكارت كحساب أساسي الآن' : 'Add Primary Bank Card Now'}
               </Text>
             </TouchableOpacity>
 
-            {/* Existing Default & Custom Cards List */}
-            <Text style={[styles.sectionTitle, isArabic && { textAlign: 'right' }]}>
-              {isArabic
-                ? `البطاقات والبنوك المضافة (${customAccounts.length})`
-                : `Your Custom Banks & Cards (${customAccounts.length})`}
-            </Text>
+            {/* All Active Primary Bank Cards (Built-in + User-Added) */}
+            <View style={[styles.sectionHeaderRow, isArabic && { flexDirection: 'row-reverse' }]}>
+              <Text style={[styles.sectionTitle, isArabic && { textAlign: 'right' }]}>
+                {isArabic
+                  ? `الكروت والبنوك الأساسية (${totalCardsCount})`
+                  : `Active Primary Bank Cards (${totalCardsCount})`}
+              </Text>
+              {(deletedAccountIds || []).length > 0 && (
+                <TouchableOpacity onPress={restoreBuiltInAccounts} style={styles.restoreBtn}>
+                  <Text style={styles.restoreBtnText}>
+                    {isArabic ? 'استعادة الافتراضي ↺' : 'Restore Defaults ↺'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
 
-            {customAccounts.length === 0 ? (
+            {builtInBankCards.map((card) => (
+              <View
+                key={card.id}
+                style={[styles.cardItem, isArabic && { flexDirection: 'row-reverse' }]}
+              >
+                <View
+                  style={[
+                    styles.cardBadge,
+                    { backgroundColor: card.isCredit ? '#FEF3C7' : '#DBEAFE' },
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name={card.isCredit ? 'credit-card-clock-outline' : 'credit-card-outline'}
+                    size={20}
+                    color={card.isCredit ? '#D97706' : '#2563EB'}
+                  />
+                </View>
+                <View style={[{ flex: 1, marginHorizontal: 10 }, isArabic && { alignItems: 'flex-end' }]}>
+                  <Text style={styles.cardItemTitle}>{card.title}</Text>
+                  <Text style={styles.cardItemSub}>{card.subText}</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => handleDeleteBuiltIn(card)}
+                  style={styles.deleteBtn}
+                >
+                  <MaterialCommunityIcons name="trash-can-outline" size={20} color="#DC2626" />
+                </TouchableOpacity>
+              </View>
+            ))}
+
+            {(customAccounts || []).map((acc) => {
+              const isCredit = acc.accountType === 'credit';
+              const linkedLbl = getLinkedLabel(acc.linkedAccountType || (isCredit ? 'credit' : 'current'));
+              return (
+                <View
+                  key={acc.id}
+                  style={[styles.cardItem, isArabic && { flexDirection: 'row-reverse' }]}
+                >
+                  <View
+                    style={[
+                      styles.cardBadge,
+                      { backgroundColor: isCredit ? '#FEF3C7' : '#DBEAFE' },
+                    ]}
+                  >
+                    <MaterialCommunityIcons
+                      name={isCredit ? 'credit-card-clock-outline' : 'credit-card-outline'}
+                      size={20}
+                      color={isCredit ? '#D97706' : '#2563EB'}
+                    />
+                  </View>
+                  <View style={[{ flex: 1, marginHorizontal: 10 }, isArabic && { alignItems: 'flex-end' }]}>
+                    <Text style={styles.cardItemTitle}>{acc.bankName}</Text>
+                    <Text style={styles.cardItemSub}>
+                      {isCredit
+                        ? isArabic
+                          ? `كريديت • ${linkedLbl} • مرحل: ${formatAmount((acc.carryOverDueThisMonth || 0) + (acc.carryOverDueNextMonth || 0))} ${currency.symbol}`
+                          : `Credit • ${linkedLbl} • Due: ${formatAmount((acc.carryOverDueThisMonth || 0) + (acc.carryOverDueNextMonth || 0))} ${currency.symbol}`
+                        : isArabic
+                        ? `ديبيت • ${linkedLbl} • رصيد بداية: ${formatAmount(acc.startingBalance)} ${currency.symbol}`
+                        : `Debit • ${linkedLbl} • Start: ${formatAmount(acc.startingBalance)} ${currency.symbol}`}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => handleDeleteCustom(acc)}
+                    style={styles.deleteBtn}
+                  >
+                    <MaterialCommunityIcons name="trash-can-outline" size={20} color="#DC2626" />
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
+
+            {totalCardsCount === 0 && (
               <View style={styles.emptyBox}>
                 <Text style={styles.emptyText}>
                   {isArabic
-                    ? 'لم تقم بإضافة كروت إضافية بعد (الافتراضي: كاش، بطاقة بنكية، البنك العربي، كريدي أجريكول).'
-                    : 'No custom banks added yet (Default: Cash, Debit Card, Arab Bank, Crédit Agricole).'}
+                    ? 'لا توجد كروت بنكية مفعلة حالياً. أضف كارتاً جديداً بالأعلى أو استعد الكروت الافتراضية.'
+                    : 'No active bank cards right now. Add a new card above or restore defaults.'}
                 </Text>
               </View>
-            ) : (
-              customAccounts.map((acc) => {
-                const isCredit = acc.accountType === 'credit';
-                return (
-                  <View
-                    key={acc.id}
-                    style={[styles.cardItem, isArabic && { flexDirection: 'row-reverse' }]}
-                  >
-                    <View
-                      style={[
-                        styles.cardBadge,
-                        { backgroundColor: isCredit ? '#FEF3C7' : '#DBEAFE' },
-                      ]}
-                    >
-                      <MaterialCommunityIcons
-                        name={isCredit ? 'credit-card-clock-outline' : 'credit-card-outline'}
-                        size={20}
-                        color={isCredit ? '#D97706' : '#2563EB'}
-                      />
-                    </View>
-                    <View style={[{ flex: 1, marginHorizontal: 10 }, isArabic && { alignItems: 'flex-end' }]}>
-                      <Text style={styles.cardItemTitle}>{acc.bankName}</Text>
-                      <Text style={styles.cardItemSub}>
-                        {isCredit
-                          ? isArabic
-                            ? `بطاقة ائتمان (Credit Card) • مرحل: ${formatAmount(acc.carryOverDueThisMonth)} ${currency.symbol}`
-                            : `Credit Card (CC) • Carry-over: ${formatAmount(acc.carryOverDueThisMonth)} ${currency.symbol}`
-                          : isArabic
-                          ? `DC / حساب بنكي • رصيد بداية: ${formatAmount(acc.startingBalance)} ${currency.symbol}`
-                          : `DC / Bank Account • Start: ${formatAmount(acc.startingBalance)} ${currency.symbol}`}
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      onPress={() => handleDelete(acc)}
-                      style={styles.deleteBtn}
-                    >
-                      <MaterialCommunityIcons name="trash-can-outline" size={20} color="#DC2626" />
-                    </TouchableOpacity>
-                  </View>
-                );
-              })
             )}
           </ScrollView>
         </View>
@@ -278,7 +427,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    maxHeight: '90%',
+    maxHeight: '92%',
   },
   header: {
     flexDirection: 'row',
@@ -290,7 +439,7 @@ const styles = StyleSheet.create({
     borderBottomColor: COLORS.borderLight,
   },
   title: {
-    fontSize: 16,
+    fontSize: 15.5,
     fontWeight: '800',
     color: COLORS.textPrimary,
   },
@@ -301,6 +450,7 @@ const styles = StyleSheet.create({
   },
   body: {
     padding: 20,
+    paddingBottom: 32,
   },
   label: {
     fontSize: 12,
@@ -312,7 +462,7 @@ const styles = StyleSheet.create({
   typeRow: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   typeBtn: {
     flex: 1,
@@ -340,6 +490,35 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
   typeBtnTextActive: {
+    color: '#FFFFFF',
+  },
+  linkedRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 7,
+    marginBottom: 6,
+  },
+  linkedChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: COLORS.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  linkedChipActive: {
+    backgroundColor: '#059669',
+    borderColor: '#047857',
+  },
+  linkedChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+  },
+  linkedChipTextActive: {
     color: '#FFFFFF',
   },
   textInput: {
@@ -375,11 +554,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
   },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
   sectionTitle: {
     fontSize: 13,
     fontWeight: '800',
     color: COLORS.textPrimary,
-    marginBottom: 10,
+  },
+  restoreBtn: {
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#6EE7B7',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  restoreBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#065F46',
   },
   emptyBox: {
     padding: 16,
@@ -413,7 +610,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   cardItemTitle: {
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: '800',
     color: COLORS.textPrimary,
   },

@@ -52,15 +52,57 @@ export const requestNotificationPermissionsAndSetupChannel = async () => {
  * of the current month (and next month if those dates have already passed),
  * reminding the user on the lock screen & home screen of the exact Credit Card amount due.
  */
-export const syncMonthlyCreditCardNotifications = async (balances, currency, formatAmount, isArabic, enabled = true) => {
+export const syncMonthlyCreditCardNotifications = async (
+  balances,
+  currency,
+  formatAmount,
+  isArabic,
+  enabled = true,
+  dailyReminderEnabled = true
+) => {
   try {
     await Notifications.cancelAllScheduledNotificationsAsync();
-    if (!enabled) {
+    if (!enabled && !dailyReminderEnabled) {
       return { scheduled: 0, granted: false, disabled: true };
     }
 
     const granted = await requestNotificationPermissionsAndSetupChannel();
     if (!granted) return { scheduled: 0, granted: false };
+
+    let scheduledCount = 0;
+
+    // 0. Schedule Daily 11:00 PM (23:00) Expense Logging Reminder
+    if (dailyReminderEnabled) {
+      try {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: isArabic
+              ? '📝 مصروفي • تذكير تسجيل مصروفات اليوم'
+              : '📝 Masrofy • Daily Expense Reminder',
+            body: isArabic
+              ? 'الساعة 11 مساءً — لا تنسَ تسجيل مصروفات اليوم قبل انتهاء اليوم للحفاظ على دقة حساباتك.'
+              : 'It is 11:00 PM — don’t forget to log today’s expenses to keep your balances accurate.',
+            sound: 'default',
+            priority: Notifications.AndroidNotificationPriority.MAX,
+            ...(Platform.OS === 'android' ? { channelId: CHANNEL_ID } : {}),
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes
+              ? Notifications.SchedulableTriggerInputTypes.DAILY
+              : 'daily',
+            hour: 23,
+            minute: 0,
+          },
+        });
+        scheduledCount += 1;
+      } catch (dailyErr) {
+        console.log('Daily 11PM reminder schedule info:', dailyErr?.message);
+      }
+    }
+
+    if (!enabled) {
+      return { scheduled: scheduledCount, granted: true };
+    }
 
     const now = new Date();
     const curYear = now.getFullYear();
@@ -69,7 +111,6 @@ export const syncMonthlyCreditCardNotifications = async (balances, currency, for
     const nextYear = curMonthIdx === 11 ? curYear + 1 : curYear;
 
     const reminderDays = [20, 21, 22, 23, 24, 25];
-    let scheduledCount = 0;
 
     // 1. Schedule for Current Month (20..25) if there is an amount due this month
     if (balances.totalCcDueThisMonth > 0) {
@@ -262,6 +303,42 @@ export const sendTestCreditCardNotification = async (balances, currency, formatA
     return true;
   } catch (e) {
     console.log('Test notification error:', e?.message);
+    return false;
+  }
+};
+
+/**
+ * Immediate notification when a Certificate or Deposit interest yield is automatically credited to Income.
+ */
+export const sendCertificateInterestNotification = async (cert, amount, currency, formatAmount, isArabic) => {
+  try {
+    const granted = await requestNotificationPermissionsAndSetupChannel();
+    if (!granted || !cert) return false;
+
+    const kindAr = cert.kind === 'deposit' ? 'وديعة' : 'شهادة';
+    const kindEn = cert.kind === 'deposit' ? 'Deposit' : 'Certificate';
+
+    const title = isArabic
+      ? `💰 إضافة عائد ${kindAr} تلقائياً للوارد`
+      : `💰 ${kindEn} Interest Credited to Income`;
+
+    const body = isArabic
+      ? `تمت إضافة عائد «${cert.name}» بمبلغ ${formatAmount(amount)} ${currency.symbol} (نسبة ${cert.interestRate}%) تلقائياً إلى الوارد.`
+      : `Interest of ${formatAmount(amount)} ${currency.symbol} (${cert.interestRate}%) from "${cert.name}" was automatically added to Income.`;
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        sound: 'default',
+        priority: Notifications.AndroidNotificationPriority.MAX,
+        ...(Platform.OS === 'android' ? { channelId: CHANNEL_ID } : {}),
+      },
+      trigger: null,
+    });
+    return true;
+  } catch (e) {
+    console.log('Certificate interest notification info:', e?.message);
     return false;
   }
 };
