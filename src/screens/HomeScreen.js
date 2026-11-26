@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 
 const GOLD_LOGO_IMAGE = require('../../assets/masrofy-gold-logo.jpg');
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, SHADOWS } from '../constants/theme';
 import { useExpense } from '../context/ExpenseContext';
@@ -50,6 +50,7 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
   } = useExpense();
 
   const { width: winWidth } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [modalType, setModalType] = useState('expense');
@@ -277,14 +278,14 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
             ]}
             style={styles.actionTabsScroll}
           >
-            {/* Unified Action Bar Buttons (All matching Reload button style) */}
+            {/* Unified Action Bar Buttons (Deep Crimson background + Beige text & icons) */}
             <TouchableOpacity
               style={[
                 styles.syncBtn,
                 {
-                  backgroundColor: isDarkMode ? themeColors.surfaceSecondary : '#F8FAFC',
-                  borderColor: isDarkMode ? themeColors.border : '#CBD5E1',
-                  paddingHorizontal: 9,
+                  backgroundColor: '#7F1D1D',
+                  borderColor: '#991B1B',
+                  paddingHorizontal: 10,
                 },
               ]}
               onPress={() => {
@@ -293,8 +294,8 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
               }}
               activeOpacity={0.7}
             >
-              <MaterialCommunityIcons name="calendar-refresh-outline" size={15} color={isDarkMode ? themeColors.primary : '#334155'} />
-              <Text style={[styles.syncBtnText, { color: isDarkMode ? themeColors.textPrimary : '#334155', fontWeight: '700' }]}>
+              <MaterialCommunityIcons name="calendar-refresh-outline" size={15} color="#F5E6C8" />
+              <Text style={[styles.syncBtnText, { color: '#F5E6C8', fontWeight: '800' }]}>
                 {isArabic ? 'فواتير متكررة 📅' : 'Recurring 📅'}
               </Text>
             </TouchableOpacity>
@@ -303,9 +304,9 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
               style={[
                 styles.syncBtn,
                 {
-                  backgroundColor: isDarkMode ? themeColors.surfaceSecondary : '#F8FAFC',
-                  borderColor: isDarkMode ? themeColors.border : '#CBD5E1',
-                  paddingHorizontal: 9,
+                  backgroundColor: '#7F1D1D',
+                  borderColor: '#991B1B',
+                  paddingHorizontal: 10,
                 },
               ]}
               onPress={() => {
@@ -314,8 +315,8 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
               }}
               activeOpacity={0.7}
             >
-              <MaterialCommunityIcons name="piggy-bank-outline" size={15} color={isDarkMode ? themeColors.primary : '#334155'} />
-              <Text style={[styles.syncBtnText, { color: isDarkMode ? themeColors.textPrimary : '#334155', fontWeight: '700' }]}>
+              <MaterialCommunityIcons name="piggy-bank-outline" size={15} color="#F5E6C8" />
+              <Text style={[styles.syncBtnText, { color: '#F5E6C8', fontWeight: '800' }]}>
                 {isArabic ? 'أهداف الادخار 🎯' : 'Savings 🎯'}
               </Text>
             </TouchableOpacity>
@@ -324,16 +325,16 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
               style={[
                 styles.syncBtn,
                 {
-                  backgroundColor: isDarkMode ? themeColors.surfaceSecondary : '#F8FAFC',
-                  borderColor: isDarkMode ? themeColors.border : '#CBD5E1',
-                  paddingHorizontal: 9,
+                  backgroundColor: '#7F1D1D',
+                  borderColor: '#991B1B',
+                  paddingHorizontal: 10,
                 },
               ]}
               onPress={() => setManageCategoriesVisible(true)}
               activeOpacity={0.7}
             >
-              <MaterialCommunityIcons name="shape-outline" size={15} color={isDarkMode ? themeColors.primary : '#334155'} />
-              <Text style={[styles.syncBtnText, { color: isDarkMode ? themeColors.textPrimary : '#334155', fontWeight: '700' }]}>
+              <MaterialCommunityIcons name="shape-outline" size={15} color="#F5E6C8" />
+              <Text style={[styles.syncBtnText, { color: '#F5E6C8', fontWeight: '800' }]}>
                 {isArabic ? 'إدارة وحذف البنود 🏷️' : 'Manage Categories 🏷️'}
               </Text>
             </TouchableOpacity>
@@ -342,16 +343,16 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
               style={[
                 styles.syncBtn,
                 {
-                  backgroundColor: isDarkMode ? themeColors.surfaceSecondary : '#F8FAFC',
-                  borderColor: isDarkMode ? themeColors.border : '#CBD5E1',
-                  paddingHorizontal: 8,
+                  backgroundColor: '#7F1D1D',
+                  borderColor: '#991B1B',
+                  paddingHorizontal: 9,
                 },
               ]}
               onPress={toggleLanguage}
               activeOpacity={0.7}
             >
-              <MaterialCommunityIcons name="translate" size={15} color={isDarkMode ? themeColors.primary : '#334155'} />
-              <Text style={[styles.syncBtnText, { color: isDarkMode ? themeColors.textPrimary : '#334155', fontWeight: '700' }]}>
+              <MaterialCommunityIcons name="translate" size={15} color="#F5E6C8" />
+              <Text style={[styles.syncBtnText, { color: '#F5E6C8', fontWeight: '800' }]}>
                 {isArabic ? 'English' : 'عربي'}
               </Text>
             </TouchableOpacity>
@@ -361,16 +362,16 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
               style={[
                 styles.syncBtn,
                 {
-                  backgroundColor: isDarkMode ? themeColors.surfaceSecondary : '#F8FAFC',
-                  borderColor: isDarkMode ? themeColors.border : '#CBD5E1',
-                  paddingHorizontal: 9,
+                  backgroundColor: '#7F1D1D',
+                  borderColor: '#991B1B',
+                  paddingHorizontal: 10,
                 },
               ]}
               onPress={handleOpenRollover}
               activeOpacity={0.7}
             >
-              <MaterialCommunityIcons name="calendar-sync" size={15} color={isDarkMode ? themeColors.primary : '#334155'} />
-              <Text style={[styles.syncBtnText, { color: isDarkMode ? themeColors.textPrimary : '#334155', fontWeight: '700' }]}>
+              <MaterialCommunityIcons name="calendar-sync" size={15} color="#F5E6C8" />
+              <Text style={[styles.syncBtnText, { color: '#F5E6C8', fontWeight: '800' }]}>
                 {isArabic ? 'ترحيل وشهر جديد' : 'Rollover Month'}
               </Text>
             </TouchableOpacity>
@@ -379,16 +380,16 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
               style={[
                 styles.syncBtn,
                 {
-                  backgroundColor: isDarkMode ? themeColors.surfaceSecondary : '#F8FAFC',
-                  borderColor: isDarkMode ? themeColors.border : '#CBD5E1',
-                  paddingHorizontal: 8,
+                  backgroundColor: '#7F1D1D',
+                  borderColor: '#991B1B',
+                  paddingHorizontal: 9,
                 },
               ]}
               onPress={() => setBanksModalVisible(true)}
               activeOpacity={0.7}
             >
-              <MaterialCommunityIcons name="bank-plus" size={15} color={isDarkMode ? themeColors.primary : '#334155'} />
-              <Text style={[styles.syncBtnText, { color: isDarkMode ? themeColors.textPrimary : '#334155', fontWeight: '700' }]}>
+              <MaterialCommunityIcons name="bank-plus" size={15} color="#F5E6C8" />
+              <Text style={[styles.syncBtnText, { color: '#F5E6C8', fontWeight: '800' }]}>
                 {isArabic ? '+ بنك/كارت' : '+ Bank/Card'}
               </Text>
             </TouchableOpacity>
@@ -397,9 +398,9 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
               style={[
                 styles.syncBtn,
                 {
-                  backgroundColor: isDarkMode ? themeColors.surfaceSecondary : '#F8FAFC',
-                  borderColor: isDarkMode ? themeColors.border : '#CBD5E1',
-                  paddingHorizontal: 8,
+                  backgroundColor: '#7F1D1D',
+                  borderColor: '#991B1B',
+                  paddingHorizontal: 9,
                 },
               ]}
               onPress={() => setDueReminderVisible(true)}
@@ -408,9 +409,9 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
               <MaterialCommunityIcons
                 name={alertPrefs?.startupAlertEnabled === false && alertPrefs?.phoneNotificationsEnabled === false ? 'bell-off-outline' : 'bell-ring-outline'}
                 size={15}
-                color={isDarkMode ? themeColors.primary : '#334155'}
+                color="#F5E6C8"
               />
-              <Text style={[styles.syncBtnText, { color: isDarkMode ? themeColors.textPrimary : '#334155', fontWeight: '700' }]}>
+              <Text style={[styles.syncBtnText, { color: '#F5E6C8', fontWeight: '800' }]}>
                 {isArabic ? 'التنبيه' : 'CC Alert'}
               </Text>
             </TouchableOpacity>
@@ -420,16 +421,16 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
               style={[
                 styles.syncBtn,
                 {
-                  backgroundColor: isDarkMode ? themeColors.surfaceSecondary : '#F8FAFC',
-                  borderColor: isDarkMode ? themeColors.border : '#CBD5E1',
-                  paddingHorizontal: 9,
+                  backgroundColor: '#7F1D1D',
+                  borderColor: '#991B1B',
+                  paddingHorizontal: 10,
                 },
               ]}
               onPress={() => setVoiceQueryVisible(true)}
               activeOpacity={0.7}
             >
-              <MaterialCommunityIcons name="microphone-message" size={15} color={isDarkMode ? themeColors.primary : '#334155'} />
-              <Text style={[styles.syncBtnText, { color: isDarkMode ? themeColors.textPrimary : '#334155', fontWeight: '700' }]}>
+              <MaterialCommunityIcons name="microphone-message" size={15} color="#F5E6C8" />
+              <Text style={[styles.syncBtnText, { color: '#F5E6C8', fontWeight: '800' }]}>
                 {isArabic ? 'استعلام صوتي 🎙️' : 'Voice Query 🎙️'}
               </Text>
             </TouchableOpacity>
@@ -439,9 +440,9 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
               style={[
                 styles.syncBtn,
                 {
-                  backgroundColor: isDarkMode ? themeColors.surfaceSecondary : '#F8FAFC',
-                  borderColor: isDarkMode ? themeColors.border : '#CBD5E1',
-                  paddingHorizontal: 9,
+                  backgroundColor: '#7F1D1D',
+                  borderColor: '#991B1B',
+                  paddingHorizontal: 10,
                 },
               ]}
               onPress={toggleDarkMode}
@@ -450,9 +451,9 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
               <MaterialCommunityIcons
                 name={isDarkMode ? 'weather-sunny' : 'weather-night'}
                 size={15}
-                color={isDarkMode ? themeColors.primary : '#334155'}
+                color="#F5E6C8"
               />
-              <Text style={[styles.syncBtnText, { color: isDarkMode ? themeColors.textPrimary : '#334155', fontWeight: '700' }]}>
+              <Text style={[styles.syncBtnText, { color: '#F5E6C8', fontWeight: '800' }]}>
                 {isDarkMode ? (isArabic ? 'نهاري ☀️' : 'Light ☀️') : (isArabic ? 'ليلي 🌙' : 'Dark 🌙')}
               </Text>
             </TouchableOpacity>
@@ -462,9 +463,9 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
               style={[
                 styles.syncBtn,
                 {
-                  backgroundColor: isDarkMode ? themeColors.surfaceSecondary : '#F8FAFC',
-                  borderColor: isDarkMode ? themeColors.border : '#CBD5E1',
-                  paddingHorizontal: 8,
+                  backgroundColor: '#7F1D1D',
+                  borderColor: '#991B1B',
+                  paddingHorizontal: 9,
                 },
               ]}
               onPress={() => {
@@ -476,8 +477,8 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
               }}
               activeOpacity={0.7}
             >
-              <MaterialCommunityIcons name="reload" size={14} color={isDarkMode ? themeColors.primary : '#334155'} />
-              <Text style={[styles.syncBtnText, { color: isDarkMode ? themeColors.textPrimary : '#334155', fontWeight: '700' }]}>
+              <MaterialCommunityIcons name="reload" size={14} color="#F5E6C8" />
+              <Text style={[styles.syncBtnText, { color: '#F5E6C8', fontWeight: '800' }]}>
                 {isArabic ? 'تحديث' : 'Reload'}
               </Text>
             </TouchableOpacity>
@@ -706,7 +707,7 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
           animationType="fade"
           onRequestClose={() => setDueReminderVisible(false)}
         >
-          <View style={styles.reminderOverlay}>
+          <View style={[styles.reminderOverlay, { paddingTop: Math.max(insets.top, 16), paddingBottom: Math.max(insets.bottom, 20) }]}>
             <ScrollView
               style={{ width: '100%' }}
               contentContainerStyle={styles.reminderScrollContent}

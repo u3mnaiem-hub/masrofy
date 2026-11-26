@@ -10,6 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/theme';
 import { useExpense } from '../context/ExpenseContext';
 
@@ -34,6 +35,7 @@ export const ManageBanksModal = ({ visible, onClose }) => {
     isArabic,
   } = useExpense();
 
+  const insets = useSafeAreaInsets();
   const [accountType, setAccountType] = useState('debit'); // 'debit' | 'credit'
   const [linkedAccountType, setLinkedAccountType] = useState('current'); // 'current' | 'savings' | 'meeza' | 'credit'
   const [bankName, setBankName] = useState('');
@@ -155,7 +157,7 @@ export const ManageBanksModal = ({ visible, onClose }) => {
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <View style={styles.content}>
+        <View style={[styles.content, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
           <View style={[styles.header, isArabic && { flexDirection: 'row-reverse' }]}>
             <View style={{ width: 36 }} />
             <Text style={styles.title}>

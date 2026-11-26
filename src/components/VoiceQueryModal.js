@@ -5,10 +5,10 @@ import {
   StyleSheet,
   Modal,
   TouchableOpacity,
-  SafeAreaView,
   TextInput,
   ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, SHADOWS } from '../constants/theme';
 import { useExpense } from '../context/ExpenseContext';

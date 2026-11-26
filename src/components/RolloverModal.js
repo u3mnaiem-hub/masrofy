@@ -10,6 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/theme';
 import { useExpense } from '../context/ExpenseContext';
 
@@ -33,6 +34,7 @@ const isValidDate = (s) => /^\d{4}-\d{2}-\d{2}$/.test((s || '').trim()) && !isNa
 export const RolloverModal = ({ visible, onClose }) => {
   const { balances, startNewMonthCycle, currency, formatAmount, isArabic, transactions, deletedAccountIds } = useExpense();
 
+  const insets = useSafeAreaInsets();
   const [newStart, setNewStart] = useState('');
   const [newEnd, setNewEnd] = useState('');
   const [extraDc, setExtraDc] = useState('');
@@ -120,7 +122,7 @@ export const RolloverModal = ({ visible, onClose }) => {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={styles.content}>
+        <View style={[styles.content, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
           <View style={[styles.header, isArabic && { flexDirection: 'row-reverse' }]}>
             <View style={{ width: 36 }} />
             <Text style={styles.title}>{isArabic ? 'ترحيل وفتح شهر جديد 🗓️' : 'Roll Over & Open New Month 🗓️'}</Text>

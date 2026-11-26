@@ -12,6 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/theme';
 import { useExpense } from '../context/ExpenseContext';
 import { EXPENSE_CATEGORIES } from '../constants/categories';
@@ -26,6 +27,7 @@ export const ExcelSheetEntryModal = ({ visible, onClose }) => {
     addTransactionsBatch,
   } = useExpense();
 
+  const insets = useSafeAreaInsets();
   const todayStr = new Date().toISOString().split('T')[0];
 
   const createEmptyRow = (customDate = null) => ({
@@ -137,7 +139,7 @@ export const ExcelSheetEntryModal = ({ visible, onClose }) => {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         {/* Header */}
-        <View style={[styles.header, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.header, isArabic && { flexDirection: 'row-reverse' }, { paddingTop: Math.max(insets.top, 14) + 6 }]}>
           <View style={[styles.titleGroup, isArabic && { flexDirection: 'row-reverse' }]}>
             <View style={styles.excelIconBox}>
               <MaterialCommunityIcons name="file-excel-box" size={24} color="#107C41" />
@@ -291,7 +293,7 @@ export const ExcelSheetEntryModal = ({ visible, onClose }) => {
         </ScrollView>
 
         {/* Bottom Sticky Action Bar */}
-        <View style={[styles.bottomBar, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.bottomBar, isArabic && { flexDirection: 'row-reverse' }, { paddingBottom: Math.max(insets.bottom, 16) + 10 }]}>
           <View style={isArabic ? { alignItems: 'flex-end' } : { alignItems: 'flex-start' }}>
             <Text style={styles.bottomSubText}>
               {isArabic

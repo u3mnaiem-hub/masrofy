@@ -82,7 +82,19 @@ function MainApp() {
     };
 
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#0F172A', padding: 24 }]}>
+      <View
+        style={[
+          styles.container,
+          {
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: '#0F172A',
+            padding: 24,
+            paddingTop: Math.max(insets.top, 24),
+            paddingBottom: Math.max(insets.bottom, 24),
+          },
+        ]}
+      >
         <StatusBar style="light" backgroundColor="#0F172A" />
         <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: themeColors.primary, justifyContent: 'center', alignItems: 'center', marginBottom: 14 }}>
           <MaterialCommunityIcons name={biometricEnabled && biometricHardwareAvailable ? 'fingerprint' : 'lock'} size={38} color="#FFFFFF" />

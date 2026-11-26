@@ -12,6 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/theme';
 import { useExpense } from '../context/ExpenseContext';
 import { EXPENSE_CATEGORIES } from '../constants/categories';
@@ -27,6 +28,7 @@ export const ManageCategoriesModal = ({ visible, onClose }) => {
     themeColors,
   } = useExpense();
 
+  const insets = useSafeAreaInsets();
   const [newCatModalVisible, setNewCatModalVisible] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [selectedColor, setSelectedColor] = useState('#8B5CF6');
@@ -123,21 +125,30 @@ export const ManageCategoriesModal = ({ visible, onClose }) => {
   return (
     <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={[styles.modalContent, isDarkMode && { backgroundColor: themeColors.surface }]}>
+        <View
+          style={[
+            styles.modalContent,
+            isDarkMode && { backgroundColor: themeColors.surface },
+            { paddingBottom: Math.max(insets.bottom, 16) + 12 },
+          ]}
+        >
           {/* Header */}
           <View style={[styles.header, isArabic && { flexDirection: 'row-reverse' }, isDarkMode && { borderBottomColor: themeColors.border }]}>
             <TouchableOpacity onPress={onClose} style={[styles.closeBtn, isDarkMode && { backgroundColor: '#1E1E1E' }]}>
-              <MaterialCommunityIcons name="close" size={24} color={isDarkMode ? '#FFFFFF' : COLORS.textPrimary} />
+              <MaterialCommunityIcons name="close" size={22} color={isDarkMode ? '#FFFFFF' : COLORS.textPrimary} />
             </TouchableOpacity>
-            <View style={{ alignItems: 'center' }}>
-              <Text style={[styles.headerTitle, isDarkMode && { color: themeColors.textPrimary }]}>
+            <View style={{ flex: 1, alignItems: 'center', paddingHorizontal: 8 }}>
+              <Text
+                style={[styles.headerTitle, isDarkMode && { color: themeColors.textPrimary }]}
+                numberOfLines={2}
+              >
                 {isArabic ? 'إدارة وحذف بنود المصروفات 🏷️' : 'Manage & Delete Categories 🏷️'}
               </Text>
               <Text style={[styles.headerSub, isDarkMode && { color: themeColors.textSecondary }]}>
                 {isArabic ? `إجمالي البنود المفعلة: ${categories.length}` : `Active Categories: ${categories.length}`}
               </Text>
             </View>
-            <View style={{ width: 36 }} />
+            <View style={{ width: 34 }} />
           </View>
 
           {/* Action Row: Add New & Restore */}
@@ -147,26 +158,35 @@ export const ManageCategoriesModal = ({ visible, onClose }) => {
               onPress={() => setNewCatModalVisible(true)}
               activeOpacity={0.8}
             >
-              <MaterialCommunityIcons name="plus-circle" size={18} color="#FFFFFF" />
+              <MaterialCommunityIcons name="plus-circle" size={16} color="#FFFFFF" />
               <Text style={styles.addBtnText}>
-                {isArabic ? 'إضافة بند جديد ➕' : 'Add New Category ➕'}
+                {isArabic ? 'إضافة بند جديد' : 'Add Category'}
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.restoreBtn, isArabic && { flexDirection: 'row-reverse' }]}
+              style={[
+                styles.restoreBtn,
+                isArabic && { flexDirection: 'row-reverse' },
+                isDarkMode && { backgroundColor: '#1E293B', borderColor: '#334155' },
+              ]}
               onPress={handleRestoreDefaults}
               activeOpacity={0.7}
             >
-              <MaterialCommunityIcons name="restore" size={16} color="#475569" />
-              <Text style={styles.restoreBtnText}>
-                {isArabic ? 'استعادة الافتراضي 🔄' : 'Restore Defaults 🔄'}
+              <MaterialCommunityIcons name="restore" size={16} color={isDarkMode ? '#E2E8F0' : '#334155'} />
+              <Text style={[styles.restoreBtnText, isDarkMode && { color: '#E2E8F0' }]}>
+                {isArabic ? 'استعادة الافتراضي' : 'Restore Defaults'}
               </Text>
             </TouchableOpacity>
           </View>
 
           {/* Categories List */}
-          <ScrollView contentContainerStyle={styles.scrollList} showsVerticalScrollIndicator={true}>
+          <ScrollView
+            style={{ flexShrink: 1 }}
+            contentContainerStyle={[styles.scrollList, { paddingBottom: Math.max(insets.bottom, 16) + 20 }]}
+            showsVerticalScrollIndicator={true}
+            keyboardShouldPersistTaps="handled"
+          >
             {categories.map((cat, idx) => {
               const catName = isArabic ? (cat.nameAr || cat.name) : cat.name;
               return (
@@ -176,11 +196,19 @@ export const ManageCategoriesModal = ({ visible, onClose }) => {
                 >
                   <View style={[styles.catInfoLeft, isArabic && { flexDirection: 'row-reverse' }]}>
                     <View style={[styles.catIconBox, { backgroundColor: cat.color || '#6366F1' }]}>
-                      <MaterialCommunityIcons name={cat.icon || 'tag'} size={20} color="#FFFFFF" />
+                      <MaterialCommunityIcons name={cat.icon || 'tag'} size={18} color="#FFFFFF" />
                     </View>
-                    <View style={[{ marginHorizontal: 10 }, isArabic && { alignItems: 'flex-end' }]}>
-                      <Text style={[styles.catNameText, isDarkMode && { color: '#FFFFFF' }]}>{catName}</Text>
-                      <Text style={styles.catSubText}>
+                    <View style={[styles.catTextWrap, isArabic && { alignItems: 'flex-end' }]}>
+                      <Text
+                        style={[
+                          styles.catNameText,
+                          isDarkMode && { color: '#FFFFFF' },
+                          isArabic && { textAlign: 'right' },
+                        ]}
+                      >
+                        {catName}
+                      </Text>
+                      <Text style={[styles.catSubText, isArabic && { textAlign: 'right' }]}>
                         {cat.isCustom ? (isArabic ? 'بند مخصص' : 'Custom') : (isArabic ? 'بند أساسي' : 'Built-in')}
                       </Text>
                     </View>
@@ -192,9 +220,9 @@ export const ManageCategoriesModal = ({ visible, onClose }) => {
                     onPress={() => handleDelete(cat)}
                     activeOpacity={0.7}
                   >
-                    <MaterialCommunityIcons name="trash-can-outline" size={18} color="#DC2626" />
+                    <MaterialCommunityIcons name="trash-can-outline" size={15} color="#DC2626" />
                     <Text style={styles.deleteBtnText}>
-                      {isArabic ? 'حذف البند 🗑️' : 'Delete 🗑️'}
+                      {isArabic ? 'حذف' : 'Delete'}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -210,10 +238,16 @@ export const ManageCategoriesModal = ({ visible, onClose }) => {
             onRequestClose={() => setNewCatModalVisible(false)}
           >
             <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-              style={styles.innerOverlay}
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={[styles.innerOverlay, { paddingBottom: Math.max(insets.bottom, 20) }]}
             >
-              <View style={styles.newCatCard}>
+              <ScrollView
+                style={{ width: '100%', maxWidth: 390 }}
+                contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+              <View style={[styles.newCatCard, isDarkMode && { backgroundColor: themeColors.surface, borderWidth: 1, borderColor: themeColors.border }]}>
                 <View style={[styles.newCatHeader, isArabic && { flexDirection: 'row-reverse' }]}>
                   <MaterialCommunityIcons name="tag-plus" size={24} color="#059669" />
                   <Text style={styles.newCatTitle}>
@@ -295,6 +329,7 @@ export const ManageCategoriesModal = ({ visible, onClose }) => {
                   </TouchableOpacity>
                 </View>
               </View>
+              </ScrollView>
             </KeyboardAvoidingView>
           </Modal>
         </View>
@@ -331,19 +366,21 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surfaceSecondary,
   },
   headerTitle: {
-    fontSize: 16,
+    fontSize: 15.5,
     fontWeight: '800',
     color: COLORS.textPrimary,
+    textAlign: 'center',
+    lineHeight: 22,
   },
   headerSub: {
-    fontSize: 12,
+    fontSize: 12.5,
     color: COLORS.textMuted,
     marginTop: 2,
   },
   topActionsRow: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     gap: 8,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.borderLight,
@@ -354,35 +391,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#059669',
-    paddingVertical: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 11,
+    minHeight: 42,
     borderRadius: 12,
-    gap: 6,
+    gap: 5,
   },
   addBtnText: {
     color: '#FFFFFF',
     fontWeight: '800',
-    fontSize: 13,
+    fontSize: 12.5,
+    textAlign: 'center',
+    flexShrink: 1,
   },
   restoreBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#F1F5F9',
     borderWidth: 1,
     borderColor: '#CBD5E1',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 11,
+    minHeight: 42,
     borderRadius: 12,
-    gap: 4,
+    gap: 5,
   },
   restoreBtnText: {
-    color: '#475569',
+    color: '#334155',
     fontWeight: '700',
     fontSize: 12,
+    textAlign: 'center',
+    flexShrink: 1,
   },
   scrollList: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingHorizontal: 14,
+    paddingTop: 10,
     paddingBottom: 30,
   },
   categoryRow: {
@@ -396,42 +441,54 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     borderWidth: 1,
     borderColor: COLORS.border,
+    gap: 8,
   },
   catInfoLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    minWidth: 0,
   },
   catIconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
+  },
+  catTextWrap: {
+    flex: 1,
+    minWidth: 0,
+    marginHorizontal: 10,
   },
   catNameText: {
-    fontSize: 14,
+    fontSize: 14.5,
     fontWeight: '800',
     color: COLORS.textPrimary,
+    lineHeight: 21,
   },
   catSubText: {
-    fontSize: 11,
+    fontSize: 11.5,
     color: COLORS.textMuted,
     marginTop: 2,
   },
   deleteBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    minWidth: 66,
     backgroundColor: '#FEF2F2',
     borderWidth: 1,
     borderColor: '#FCA5A5',
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: 10,
     gap: 4,
   },
   deleteBtnText: {
-    fontSize: 12,
+    fontSize: 12.5,
     fontWeight: '800',
     color: '#DC2626',
   },

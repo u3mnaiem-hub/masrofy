@@ -10,6 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/theme';
 import { useExpense } from '../context/ExpenseContext';
 
@@ -31,6 +32,7 @@ export const SmartFeaturesModal = ({ visible, onClose, initialTab = 'recurring' 
     allPaymentMethods,
   } = useExpense();
 
+  const insets = useSafeAreaInsets();
   const [tab, setTab] = useState(initialTab === 'savings' ? 'savings' : 'recurring');
 
   useEffect(() => {
@@ -90,7 +92,7 @@ export const SmartFeaturesModal = ({ visible, onClose, initialTab = 'recurring' 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={[styles.sheet, isDarkMode && { backgroundColor: themeColors.surface }]}>
+        <View style={[styles.sheet, isDarkMode && { backgroundColor: themeColors.surface }, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
           {/* Header */}
           <View style={[styles.header, isArabic && { flexDirection: 'row-reverse' }, isDarkMode && { borderBottomColor: themeColors.border }]}>
             <Text style={[styles.title, isDarkMode && { color: themeColors.textPrimary }]}>

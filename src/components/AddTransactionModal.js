@@ -17,6 +17,7 @@ import {
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/theme';
 import {
   EXPENSE_CATEGORIES,
@@ -64,6 +65,7 @@ export const AddTransactionModal = ({
     restoreAllCategories,
   } = useExpense();
 
+  const insets = useSafeAreaInsets();
   // Mode: 'expense' | 'cc_pyd' | 'income' | 'switch'
   const [mode, setMode] = useState(initialType || 'expense');
   const [amount, setAmount] = useState('');
@@ -891,7 +893,7 @@ export const AddTransactionModal = ({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.overlay}
       >
-        <View style={styles.modalContent}>
+        <View style={[styles.modalContent, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
           {/* Header */}
           <View style={[styles.header, isArabic && { flexDirection: 'row-reverse' }]}>
             <View style={{ width: 36 }} />

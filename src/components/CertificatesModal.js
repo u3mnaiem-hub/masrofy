@@ -10,6 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/theme';
 import { useExpense } from '../context/ExpenseContext';
 
@@ -28,6 +29,7 @@ export const CertificatesModal = ({ visible, onClose }) => {
     isArabic,
   } = useExpense();
 
+  const insets = useSafeAreaInsets();
   const [kind, setKind] = useState('certificate'); // 'certificate' | 'deposit'
   const [name, setName] = useState('');
   const [principal, setPrincipal] = useState('');
@@ -159,7 +161,7 @@ export const CertificatesModal = ({ visible, onClose }) => {
   return (
     <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={styles.content}>
+        <View style={[styles.content, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
           <View style={[styles.header, isArabic && { flexDirection: 'row-reverse' }]}>
             <View style={{ width: 36 }} />
             <Text style={styles.title}>

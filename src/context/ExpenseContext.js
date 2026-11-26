@@ -1608,25 +1608,36 @@ export const ExpenseProvider = ({ children }) => {
     const totalStartedWith = effStartDc + (parseFloat(startBalances.csh) || 0) + customDebitTotalStart;
     const netAvailableAfterCards = availDc + availCsh + customDebitTotalAvail - totalCcDebt;
 
-    // Cycle Days calculation (using cycleStartDate and cycleEndDate)
-    const start = new Date(cycleStartDate);
-    const end = cycleEndDate ? new Date(cycleEndDate) : null;
-    const diffTime = Math.abs(now - start);
-    const daysElapsed = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+    // Flexible Fiscal Cycle Days calculation (NOT tied to calendar day 1 or 30/31 days)
+    const parseLocalDate = (str) => {
+      if (!str || typeof str !== 'string') return null;
+      const parts = str.split('-').map(Number);
+      if (parts.length !== 3 || parts.some(isNaN)) return null;
+      return new Date(parts[0], parts[1] - 1, parts[2]);
+    };
+    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startLocal = parseLocalDate(cycleStartDate) || todayMidnight;
+    const endLocal = parseLocalDate(cycleEndDate);
+    const msPerDay = 1000 * 60 * 60 * 24;
 
-    let totalCycleDays = 31;
-    if (end && !isNaN(end.getTime()) && !isNaN(start.getTime()) && end > start) {
-      totalCycleDays = Math.max(1, Math.round((end - start) / (1000 * 60 * 60 * 24)));
+    // Exact calendar days passed since fiscal cycle start (0 on start day itself, no +1 extra day)
+    const daysElapsed = Math.max(0, Math.round((todayMidnight - startLocal) / msPerDay));
+
+    let totalCycleDays = 30;
+    if (endLocal && endLocal > startLocal) {
+      totalCycleDays = Math.max(1, Math.round((endLocal - startLocal) / msPerDay));
     }
-    const daysLeft = Math.max(0, totalCycleDays - daysElapsed);
+    const daysLeft = endLocal
+      ? Math.max(0, Math.round((endLocal - todayMidnight) / msPerDay))
+      : Math.max(0, totalCycleDays - daysElapsed);
 
-    const avgPerDay = realTotalSpent / daysElapsed;
-    const avgOutflowPerDay = totalOutflow / daysElapsed;
+    const divisorDays = Math.max(1, daysElapsed);
+    const avgPerDay = realTotalSpent / divisorDays;
+    const avgOutflowPerDay = totalOutflow / divisorDays;
     const daysMoneyLasts = avgPerDay > 0 ? (netAvailableAfterCards / avgPerDay) : 999;
     const safeDailySpend = daysLeft > 0 ? (netAvailableAfterCards / daysLeft) : 0;
 
     // Days until current month due date (25th) and next month due date (25th)
-    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const [curDueY, curDueM, curDueD] = currentMonthDueDate.split('-').map(Number);
     const [nextDueY, nextDueM, nextDueD] = nextMonthDueDate.split('-').map(Number);
     const curDueObj = new Date(curDueY, (curDueM || 1) - 1, curDueD || 25);
@@ -1799,11 +1810,11 @@ export const ExpenseProvider = ({ children }) => {
     };
   };
 
-  // Export & Import Full Backup JSON (so user can save a backup anywhere on their phone or restore it anytime)
+  // Export & Import Full Backup JSON (complete snapshot: transactions, balances, cards, categories, certificates, cookie jar, prefs)
   const createFullBackupPayload = () => {
     return {
       appName: 'U3mXpns',
-      version: '2.5.0',
+      version: '2.6.0',
       exportedAt: new Date().toISOString(),
       developer: 'Yousry Mahmoud Naiem',
       data: {
@@ -1815,11 +1826,18 @@ export const ExpenseProvider = ({ children }) => {
         alertPrefs,
         language,
         customAccounts,
+        deletedAccountIds,
+        customCategories,
+        deletedCategoryIds,
         archivedMonths,
         categoryBudgets,
         recurringBills,
         savingsGoals,
+        certificates,
+        bkpMoney,
         colorPalette,
+        isDarkMode,
+        isBalancesHidden,
       },
     };
   };
@@ -1855,9 +1873,25 @@ export const ExpenseProvider = ({ children }) => {
       setAlertPrefs(d.alertPrefs);
       await AsyncStorage.setItem(STORAGE_KEYS.ALERT_PREFS, JSON.stringify(d.alertPrefs));
     }
+    if (typeof d.language === 'string' && (d.language === 'ar' || d.language === 'en')) {
+      setLanguageState(d.language);
+      await AsyncStorage.setItem(STORAGE_KEYS.LANGUAGE, d.language);
+    }
     if (Array.isArray(d.customAccounts)) {
       setCustomAccounts(d.customAccounts);
       await AsyncStorage.setItem(STORAGE_KEYS.CUSTOM_ACCOUNTS, JSON.stringify(d.customAccounts));
+    }
+    if (Array.isArray(d.deletedAccountIds)) {
+      setDeletedAccountIds(d.deletedAccountIds);
+      await AsyncStorage.setItem(STORAGE_KEYS.DELETED_ACCOUNTS, JSON.stringify(d.deletedAccountIds));
+    }
+    if (Array.isArray(d.customCategories)) {
+      setCustomCategories(d.customCategories);
+      await AsyncStorage.setItem(STORAGE_KEYS.CUSTOM_CATEGORIES, JSON.stringify(d.customCategories));
+    }
+    if (Array.isArray(d.deletedCategoryIds)) {
+      setDeletedCategoryIds(d.deletedCategoryIds);
+      await AsyncStorage.setItem(STORAGE_KEYS.DELETED_CATEGORIES, JSON.stringify(d.deletedCategoryIds));
     }
     if (Array.isArray(d.archivedMonths)) {
       setArchivedMonths(d.archivedMonths);
@@ -1874,6 +1908,26 @@ export const ExpenseProvider = ({ children }) => {
     if (Array.isArray(d.savingsGoals)) {
       setSavingsGoals(d.savingsGoals);
       await AsyncStorage.setItem(STORAGE_KEYS.SAVINGS_GOALS, JSON.stringify(d.savingsGoals));
+    }
+    if (Array.isArray(d.certificates)) {
+      setCertificates(d.certificates);
+      await AsyncStorage.setItem(STORAGE_KEYS.CERTIFICATES, JSON.stringify(d.certificates));
+    }
+    if (typeof d.bkpMoney === 'string') {
+      setBkpMoneyState(d.bkpMoney);
+      await AsyncStorage.setItem(STORAGE_KEYS.BKP_MONEY, d.bkpMoney);
+    }
+    if (typeof d.colorPalette === 'string') {
+      setColorPaletteState(d.colorPalette);
+      await AsyncStorage.setItem(STORAGE_KEYS.COLOR_PALETTE, d.colorPalette);
+    }
+    if (typeof d.isDarkMode === 'boolean') {
+      setIsDarkMode(d.isDarkMode);
+      await AsyncStorage.setItem(STORAGE_KEYS.DARK_MODE, JSON.stringify(d.isDarkMode));
+    }
+    if (typeof d.isBalancesHidden === 'boolean') {
+      setIsBalancesHidden(d.isBalancesHidden);
+      await AsyncStorage.setItem(STORAGE_KEYS.HIDE_BALANCES, JSON.stringify(d.isBalancesHidden));
     }
     return true;
   };

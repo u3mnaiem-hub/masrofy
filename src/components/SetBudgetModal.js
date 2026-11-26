@@ -10,6 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/theme';
 import { CURRENCIES } from '../constants/currencies';
 import { useExpense } from '../context/ExpenseContext';
@@ -27,6 +28,7 @@ export const SetBudgetModal = ({ visible, onClose }) => {
     isArabic,
   } = useExpense();
 
+  const insets = useSafeAreaInsets();
   const [cshInput, setCshInput] = useState('7250');
   const [dcInput, setDcInput] = useState('8465');
   const [cycleDateInput, setCycleDateInput] = useState('2026-10-22');
@@ -161,7 +163,7 @@ export const SetBudgetModal = ({ visible, onClose }) => {
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <View style={styles.content}>
+        <View style={[styles.content, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
           <View style={[styles.header, isArabic && { flexDirection: 'row-reverse' }]}>
             <View style={{ width: 36 }} />
             <Text style={styles.title} numberOfLines={2}>
