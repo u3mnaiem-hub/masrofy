@@ -187,7 +187,7 @@ export const HelpAndFeaturesModal = ({ visible, onClose, initialTab = 'help' }) 
           icon: 'fingerprint',
           color: '#4338CA',
           title: 'أمان وخصوصية 100% بدون إنترنت',
-          desc: 'قفل بالبصمة والرقم السري مع قفل تلقائي بعد دقيقة، زر إخفاء الأرصدة، إرفاق صور الفواتير بالكاميرا، خانة ملاحظات طوارئ bkp money، وعمل كامل بدون إنترنت.',
+          desc: 'قفل بالبصمة والرقم السري مع قفل تلقائي بعد دقيقة، زر إخفاء الأرصدة، إرفاق صور الفواتير بالكاميرا، خانة ملاحظات طوارئ «درج الشرابات»، وعمل كامل بدون إنترنت.',
         },
         {
           icon: 'palette-outline',
@@ -249,7 +249,7 @@ export const HelpAndFeaturesModal = ({ visible, onClose, initialTab = 'help' }) 
           icon: 'fingerprint',
           color: '#4338CA',
           title: '100% Offline Privacy & Biometric Security',
-          desc: 'Fingerprint & PIN lock with 1-min auto-lock, hide-balances eye toggle, receipt camera capture, subtle bkp money notes, and zero cloud dependency.',
+          desc: 'Fingerprint & PIN lock with 1-min auto-lock, hide-balances eye toggle, receipt camera capture, subtle "cookie jar" notes, and zero cloud dependency.',
         },
         {
           icon: 'palette-outline',

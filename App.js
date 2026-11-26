@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, LogBox } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, LogBox, Image, Animated } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+
+const SPLASH_SCREEN_IMAGE = require('./assets/splash-screen.jpg');
 
 // Suppress known development-only Expo Go push notification warnings
 LogBox.ignoreLogs([
@@ -278,6 +280,8 @@ function MainApp() {
 
 export default function App() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
+  const splashOpacity = React.useRef(new Animated.Value(1)).current;
 
   React.useEffect(() => {
     async function prepare() {
@@ -292,18 +296,41 @@ export default function App() {
     prepare();
   }, []);
 
-  if (!fontsLoaded) {
-    return (
-      <View style={{ flex: 1, backgroundColor: COLORS.background }} />
-    );
-  }
+  React.useEffect(() => {
+    if (!fontsLoaded) return;
+    const timer = setTimeout(() => {
+      Animated.timing(splashOpacity, {
+        toValue: 0,
+        duration: 280,
+        useNativeDriver: true,
+      }).start(() => {
+        setShowSplash(false);
+      });
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [fontsLoaded, splashOpacity]);
 
   return (
-    <SafeAreaProvider>
-      <ExpenseProvider>
-        <MainApp />
-      </ExpenseProvider>
-    </SafeAreaProvider>
+    <View style={{ flex: 1, backgroundColor: '#020B1C' }}>
+      {fontsLoaded && (
+        <SafeAreaProvider>
+          <ExpenseProvider>
+            <MainApp />
+          </ExpenseProvider>
+        </SafeAreaProvider>
+      )}
+
+      {showSplash && (
+        <Animated.View style={[styles.splashOverlay, { opacity: splashOpacity }]}>
+          <StatusBar style="light" translucent backgroundColor="transparent" />
+          <Image
+            source={SPLASH_SCREEN_IMAGE}
+            style={styles.splashFullImage}
+            resizeMode="cover"
+          />
+        </Animated.View>
+      )}
+    </View>
   );
 }
 
@@ -346,5 +373,14 @@ const styles = StyleSheet.create({
   activeNavLabel: {
     color: COLORS.primaryDark,
     fontWeight: '700',
+  },
+  splashOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#020B1C',
+    zIndex: 9999,
+  },
+  splashFullImage: {
+    width: '100%',
+    height: '100%',
   },
 });
