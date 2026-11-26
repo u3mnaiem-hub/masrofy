@@ -8,9 +8,12 @@ import {
   Animated,
   AccessibilityInfo,
   AppState,
+  Image,
 } from 'react-native';
+
+const MEEZA_CARD_IMAGE = require('../../assets/meeza-card.jpg');
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { COLORS, SHADOWS } from '../constants/theme';
+import { COLORS, SHADOWS, NEON_GLOW } from '../constants/theme';
 import { useExpense } from '../context/ExpenseContext';
 import {
   BUDGET_BLINK_THRESHOLD_PERCENT,
@@ -60,30 +63,35 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
     credit: isArabic ? 'كريديت • ائتمان' : 'CREDIT CARD',
   };
 
+  const isMeezaBankCard = (card) =>
+    card?.linkedAccountType === 'meeza' || /ميزة|ميزه|meeza/i.test(card?.bankName || '');
+
   const customDebitPlasticCards = (balances.customDebitCardsSummary || []).map((d) => ({
     id: d.id,
     title: d.bankName,
     typeBadge: LINKED_BADGE_MAP[d.linkedAccountType || 'current'] || 'DEBIT CARD',
-    digits: '4000 •••• BANK',
+    digits: isMeezaBankCard(d) ? '5078 •••• MEEZA' : '4000 •••• BANK',
     amount: d.avail,
     subText: isArabic ? `بداية الشهر: ${formatAmount(d.startBal)}` : `Start: ${formatAmount(d.startBal)}`,
     ratio: d.startBal > 0 ? Math.min(100, Math.max(0, Math.round(((d.startBal - d.avail) / d.startBal) * 100))) : 0,
     bg: '#1E40AF',
     accent: '#93C5FD',
     isCredit: false,
+    isMeeza: isMeezaBankCard(d),
   }));
 
   const customCreditPlasticCards = (balances.customCreditCardsSummary || []).map((c) => ({
     id: c.id,
     title: c.bankName,
     typeBadge: LINKED_BADGE_MAP[c.linkedAccountType || 'credit'] || 'CREDIT CARD',
-    digits: '5200 •••• CARD',
+    digits: isMeezaBankCard(c) ? '5078 •••• MEEZA' : '5200 •••• CARD',
     amount: c.totalDebt,
     subText: formatCardDueSub(c.dueThisMonth, c.dueNextMonth),
     ratio: Math.min(100, Math.round(((c.totalDebt || 0) / 10000) * 100)),
     bg: '#4C1D95',
     accent: '#C4B5FD',
     isCredit: true,
+    isMeeza: isMeezaBankCard(c),
   }));
 
   const bankCardsList = [
@@ -281,12 +289,17 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
   }, [isDebtHigh, reduceMotionEnabled, foregroundCycle, debtBlinkAnim]);
 
   return (
-    <View style={[styles.card, SHADOWS.medium, { borderColor: themeColors.primaryLight, borderWidth: 1.5 }, isDarkMode && { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
-      {/* 1. TOP SPOTLIGHT: صافي الرصيد المتواجد (بالأعلى مقسوم على 1000 مع K) وتحته ديون الكروت (بالأحمر) وجنبهم النسبة المئوية داخل مستطيل بيج فاتح بظل واضح */}
+    <View style={[styles.card, SHADOWS.medium, { borderColor: isDarkMode ? themeColors.border : themeColors.primaryLight, borderWidth: isDarkMode ? 1 : 1.5 }, isDarkMode && { backgroundColor: themeColors.surface }]}>
+      {/* 1. TOP SPOTLIGHT: صافي الرصيد المتواجد + ديون الكروت + النسبة المئوية */}
       <View
         style={[
           styles.netContainer,
-          isDarkMode && { backgroundColor: '#363126', borderColor: '#5C513D' },
+          isDarkMode && {
+            backgroundColor: '#10241C',
+            borderColor: 'rgba(60, 232, 142, 0.45)',
+            borderWidth: 1.2,
+            ...NEON_GLOW.subtle,
+          },
           isArabic ? { flexDirection: 'row-reverse' } : { flexDirection: 'row' },
         ]}
       >
@@ -294,60 +307,81 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
         <View style={[styles.netBalancesCol, isArabic ? { alignItems: 'flex-end' } : { alignItems: 'flex-start' }]}>
           {/* Top Balance: صافي الرصيد المتواجد */}
           <View style={[styles.balanceBlock, isArabic && { alignItems: 'flex-end' }]}>
-            <Text style={[styles.netLabel, isDarkMode && { color: '#EAD7A7' }]} numberOfLines={1}>
+            <Text style={[styles.netLabel, isDarkMode && { color: themeColors.textSecondary }]} numberOfLines={1}>
               {isArabic ? 'صافي الرصيد المتواجد' : 'Gross Available'}
             </Text>
             <Animated.View style={[styles.balanceValRow, { opacity: grossBlinkAnim }, isArabic && { flexDirection: 'row-reverse' }]}>
               <Text
-                style={[styles.balanceValNumber, isDarkMode && { color: '#34D399' }]}
+                style={[styles.balanceValNumber, isDarkMode && { color: themeColors.primary }]}
                 numberOfLines={1}
                 adjustsFontSizeToFit={true}
                 minimumFontScale={0.8}
               >
                 {formatGrossInK(grossAvailableBeforeCards)}
               </Text>
-              <Text style={[styles.balanceValCurrency, isDarkMode && { color: '#6EE7B7' }]}> {currency.symbol}</Text>
+              <Text style={[styles.balanceValCurrency, isDarkMode && { color: themeColors.primary }]}> {currency.symbol}</Text>
             </Animated.View>
           </View>
 
-          <View style={[styles.netDividerH, isDarkMode && { backgroundColor: '#5C513D' }]} />
+          <View style={[styles.netDividerH, isDarkMode && { backgroundColor: themeColors.border }]} />
 
           {/* Bottom Balance: ديون الكروت (بالأحمر دائماً بدون تقريب أو قسمة على الألف) */}
           <View style={[styles.balanceBlock, isArabic && { alignItems: 'flex-end' }]}>
-            <Text style={[styles.netDebtLabel, isDarkMode && { color: '#FCA5A5' }]} numberOfLines={1}>
+            <Text style={[styles.netDebtLabel, isDarkMode && { color: themeColors.textSecondary }]} numberOfLines={1}>
               {isArabic ? 'ديون الكروت' : 'Card Debts'}
             </Text>
             <Animated.View style={[styles.balanceValRow, { opacity: debtBlinkAnim }, isArabic && { flexDirection: 'row-reverse' }]}>
               <Text
-                style={[styles.balanceDebtValNumber, isDarkMode && { color: '#F87171' }]}
+                style={[styles.balanceDebtValNumber, isDarkMode && { color: themeColors.expense }]}
                 numberOfLines={1}
                 adjustsFontSizeToFit={true}
                 minimumFontScale={0.8}
               >
                 {formatAmount(totalCcDebtValue)}
               </Text>
-              <Text style={[styles.balanceDebtCurrency, isDarkMode && { color: '#FCA5A5' }]}> {currency.symbol}</Text>
+              <Text style={[styles.balanceDebtCurrency, isDarkMode && { color: themeColors.expense }]}> {currency.symbol}</Text>
             </Animated.View>
           </View>
         </View>
 
-        {/* Left side: النسبة المئوية للاستهلاك الشهري (Monthly Consumption %) - smooth blink for 5s when > 75%, then static highlight */}
+        {/* Left side: النسبة المئوية للاستهلاك الشهري (Monthly Consumption %) - smooth blink when > 75% */}
         <Animated.View
           style={[
             styles.consumptionBox,
-            {
-              backgroundColor: isCriticalConsumption ? '#B91C1C' : isHighConsumption ? '#DC2626' : themeColors.primaryDark,
-              borderColor: isCriticalConsumption ? '#FCA5A5' : isHighConsumption ? '#B91C1C' : themeColors.primary,
-              borderWidth: isCriticalConsumption ? 2 : 1,
-            },
+            isDarkMode
+              ? {
+                  backgroundColor: isHighConsumption ? themeColors.expenseLight : themeColors.primaryLight,
+                  borderColor: isHighConsumption ? themeColors.expense : themeColors.primary,
+                  borderWidth: isCriticalConsumption ? 1.8 : 1.2,
+                }
+              : {
+                  backgroundColor: isCriticalConsumption ? '#B91C1C' : isHighConsumption ? '#DC2626' : themeColors.primaryDark,
+                  borderColor: isCriticalConsumption ? '#FCA5A5' : isHighConsumption ? '#B91C1C' : themeColors.primary,
+                  borderWidth: isCriticalConsumption ? 2 : 1,
+                },
             isCriticalConsumption && { opacity: blinkAnim },
           ]}
         >
-          <MaterialCommunityIcons name="chart-pie" size={17} color="#FFFFFF" />
-          <Text style={[styles.consumptionPercentText, { color: '#FFFFFF' }]}>
+          <MaterialCommunityIcons
+            name="chart-pie"
+            size={17}
+            color={isDarkMode ? (isHighConsumption ? themeColors.expense : themeColors.primary) : '#FFFFFF'}
+          />
+          <Text
+            style={[
+              styles.consumptionPercentText,
+              { color: isDarkMode ? (isHighConsumption ? themeColors.expense : themeColors.primary) : '#FFFFFF' },
+            ]}
+          >
             {consumptionPercent}%
           </Text>
-          <Text style={[styles.consumptionLabelText, { color: '#FFFFFF' }]} numberOfLines={2}>
+          <Text
+            style={[
+              styles.consumptionLabelText,
+              { color: isDarkMode ? themeColors.textSecondary : '#FFFFFF' },
+            ]}
+            numberOfLines={2}
+          >
             {isArabic ? 'نسبة الاستهلاك\nالشهري' : 'Monthly\nConsumption'}
           </Text>
         </Animated.View>
@@ -358,35 +392,35 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
         {/* المبلغ المنصرف */}
         <View style={[styles.topFigureBlock, isArabic && { alignItems: 'flex-end' }]}>
           <View style={[styles.figureLabelRow, isArabic && { flexDirection: 'row-reverse' }]}>
-            <MaterialCommunityIcons name="arrow-up-circle" size={14} color="#DC2626" />
-            <Text style={[styles.figureLabel, { color: '#DC2626' }]}>
+            <MaterialCommunityIcons name="arrow-up-circle" size={14} color={isDarkMode ? themeColors.expense : '#C81E1E'} />
+            <Text style={[styles.figureLabel, { color: isDarkMode ? themeColors.expense : '#C81E1E' }]}>
               {isArabic ? 'المبلغ المنصرف' : 'Total Spent'}
             </Text>
           </View>
           <View style={[styles.figureNumberRow, isArabic && { flexDirection: 'row-reverse' }]}>
-            <Text style={[styles.figureMainNumber, { color: '#DC2626' }]}>
+            <Text style={[styles.figureMainNumber, { color: isDarkMode ? themeColors.expense : '#C81E1E' }]}>
               {formatAmount(balances.totalOutflow)}
             </Text>
-            <Text style={[styles.figureCurrency, { color: '#EF4444' }]}> {currency.symbol}</Text>
+            <Text style={[styles.figureCurrency, { color: isDarkMode ? themeColors.expense : '#DC2626' }]}> {currency.symbol}</Text>
           </View>
         </View>
 
         {/* فاصل وسطي خفيف */}
-        <View style={styles.topVDivider} />
+        <View style={[styles.topVDivider, isDarkMode && { backgroundColor: themeColors.border }]} />
 
-        {/* إجمالي البداية (بنفس الحجم والفونت بلون الثيم المختار) */}
+        {/* إجمالي البداية */}
         <View style={[styles.topFigureBlock, isArabic && { alignItems: 'flex-start' }]}>
           <View style={[styles.figureLabelRow, isArabic && { flexDirection: 'row-reverse' }]}>
-            <MaterialCommunityIcons name="wallet-outline" size={14} color={themeColors.primaryDark} />
-            <Text style={[styles.figureLabel, { color: isDarkMode ? themeColors.primary : themeColors.primaryDark }]}>
+            <MaterialCommunityIcons name="wallet-outline" size={14} color={isDarkMode ? themeColors.info : themeColors.primaryDark} />
+            <Text style={[styles.figureLabel, { color: isDarkMode ? themeColors.info : themeColors.primaryDark }]}>
               {isArabic ? 'إجمالي البداية' : 'Starting Base'}
             </Text>
           </View>
           <View style={[styles.figureNumberRow, isArabic && { flexDirection: 'row-reverse' }]}>
-            <Text style={[styles.figureMainNumber, { color: isDarkMode ? themeColors.primary : themeColors.primaryDark }]}>
+            <Text style={[styles.figureMainNumber, { color: isDarkMode ? themeColors.info : themeColors.primaryDark }]}>
               {formatAmount(balances.totalStartedWith)}
             </Text>
-            <Text style={[styles.figureCurrency, { color: themeColors.primary }]}> {currency.symbol}</Text>
+            <Text style={[styles.figureCurrency, { color: isDarkMode ? themeColors.info : themeColors.primary }]}> {currency.symbol}</Text>
           </View>
         </View>
       </View>
@@ -410,17 +444,22 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
 
       {/* 3. Swipeable Real Bank Cards Carousel + 4 Rectangular Blocks */}
       <View style={[styles.carouselToggleRow, isArabic && { flexDirection: 'row-reverse' }]}>
-        <Text style={[styles.carouselSectionTitle, isDarkMode && { color: themeColors.textSecondary }]}>
+        <Text
+          style={[styles.carouselSectionTitle, isArabic && { textAlign: 'right' }, isDarkMode && { color: themeColors.textSecondary }]}
+          numberOfLines={1}
+          adjustsFontSizeToFit={true}
+          minimumFontScale={0.8}
+        >
           {isArabic ? 'البطاقات والأرصدة البنكية 💳' : 'Bank Cards & Wallets 💳'}
         </Text>
         <TouchableOpacity
-          style={[styles.carouselToggleBtn, isDarkMode && { backgroundColor: themeColors.surfaceSecondary, borderColor: themeColors.border }]}
+          style={[styles.carouselToggleBtn, isArabic && { flexDirection: 'row-reverse' }, isDarkMode && { backgroundColor: themeColors.surfaceSecondary, borderColor: themeColors.border }]}
           onPress={() => setShowPlasticCards((v) => !v)}
           activeOpacity={0.75}
         >
-          <MaterialCommunityIcons name={showPlasticCards ? 'view-grid-outline' : 'cards-outline'} size={14} color={themeColors.primary} />
-          <Text style={[styles.carouselToggleText, { color: themeColors.primary }]}>
-            {showPlasticCards ? (isArabic ? 'إخفاء شريط الكروت' : 'Hide Cards') : (isArabic ? 'عرض كروت بنكية 💳' : 'Show Bank Cards 💳')}
+          <MaterialCommunityIcons name={showPlasticCards ? 'view-grid-outline' : 'cards-outline'} size={12} color={themeColors.primary} />
+          <Text style={[styles.carouselToggleText, { color: themeColors.primary }]} numberOfLines={1}>
+            {showPlasticCards ? (isArabic ? 'إخفاء الكروت' : 'Hide Cards') : (isArabic ? 'عرض الكروت 💳' : 'Show Cards 💳')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -432,6 +471,196 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
           contentContainerStyle={{ gap: 10, paddingBottom: 10, paddingHorizontal: 2 }}
         >
           {bankCardsList.map((bc) => {
+            if (bc.isMeeza) {
+              // Real Egyptian Meeza Pyramids Card artwork — absolute-filled Image for exact edge-to-edge fit on Android
+              return (
+                <TouchableOpacity
+                  key={bc.id}
+                  activeOpacity={bc.isCredit ? 0.85 : 0.95}
+                  onPress={() => bc.isCredit && onOpenPayCc && onOpenPayCc(bc.id)}
+                  style={{
+                    width: 222,
+                    minHeight: 142,
+                    borderRadius: 16,
+                    overflow: 'hidden',
+                    borderWidth: 1.5,
+                    borderColor: isDarkMode ? 'rgba(79, 209, 217, 0.45)' : '#1E3A8A',
+                    position: 'relative',
+                    backgroundColor: '#4C1D95',
+                  }}
+                >
+                  <Image
+                    source={MEEZA_CARD_IMAGE}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      width: '100%',
+                      height: '100%',
+                    }}
+                    resizeMode="stretch"
+                  />
+                  {/* Light bright veil so Dark Blue text pops crisply over the full stretched Meeza card */}
+                  <View
+                    style={{
+                      ...StyleSheet.absoluteFillObject,
+                      backgroundColor: 'rgba(255, 255, 255, 0.30)',
+                    }}
+                  />
+                  <View style={{ padding: 12, flex: 1, justifyContent: 'space-between' }}>
+                    <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <MaterialCommunityIcons name="integrated-circuit-chip" size={20} color="#B45309" />
+                        <MaterialCommunityIcons name="contactless-payment" size={16} color="#0B2545" />
+                      </View>
+                      <View style={{ backgroundColor: 'rgba(255,255,255,0.92)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                        <Text style={{ color: '#1E3A8A', fontSize: 9.5, fontWeight: '900' }}>
+                          {isArabic ? 'ميزة • Meeza' : 'MEEZA'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View>
+                      <Text
+                        style={{
+                          color: '#0B2545',
+                          fontSize: 13,
+                          fontWeight: '900',
+                          marginTop: 6,
+                          textAlign: isArabic ? 'right' : 'left',
+                          textShadowColor: 'rgba(255,255,255,0.9)',
+                          textShadowOffset: { width: 0, height: 1 },
+                          textShadowRadius: 3,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {bc.title}
+                      </Text>
+                      <Text
+                        style={{
+                          color: '#1E3A8A',
+                          fontSize: 10,
+                          fontWeight: '800',
+                          letterSpacing: 1,
+                          marginTop: 1,
+                          textAlign: isArabic ? 'right' : 'left',
+                          textShadowColor: 'rgba(255,255,255,0.85)',
+                          textShadowOffset: { width: 0, height: 1 },
+                          textShadowRadius: 2,
+                        }}
+                      >
+                        {bc.digits}
+                      </Text>
+                    </View>
+
+                    <View>
+                      <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 4 }}>
+                        <Text
+                          style={{
+                            color: '#0B2545',
+                            fontSize: 17.5,
+                            fontWeight: '900',
+                            textShadowColor: 'rgba(255,255,255,0.95)',
+                            textShadowOffset: { width: 0, height: 1 },
+                            textShadowRadius: 3,
+                          }}
+                        >
+                          {formatAmount(bc.amount)} <Text style={{ fontSize: 11, color: '#1E3A8A', fontWeight: '900' }}>{currency.symbol}</Text>
+                        </Text>
+                        {bc.isCredit && (
+                          <Text style={{ color: '#1E3A8A', fontSize: 10, fontWeight: '900' }}>
+                            {isArabic ? 'سداد 💳' : 'Pay 💳'}
+                          </Text>
+                        )}
+                      </View>
+
+                      <View style={{ height: 4, backgroundColor: 'rgba(255,255,255,0.55)', borderRadius: 3, marginTop: 5, overflow: 'hidden' }}>
+                        <View style={{ width: `${Math.max(5, bc.ratio)}%`, height: '100%', backgroundColor: '#1E3A8A' }} />
+                      </View>
+                      <Text
+                        style={{
+                          color: '#0B2545',
+                          fontSize: 9.5,
+                          fontWeight: '800',
+                          marginTop: 4,
+                          textAlign: isArabic ? 'right' : 'left',
+                          textShadowColor: 'rgba(255,255,255,0.9)',
+                          textShadowOffset: { width: 0, height: 1 },
+                          textShadowRadius: 2,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {bc.subText}
+                      </Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            }
+
+            if (isDarkMode) {
+              // Sary-inspired obsidian glass cards: Emerald for Cash, Cyan-Teal for Debit Bank, Coral-Red for Credit Cards
+              const darkAccent = bc.isCredit ? themeColors.expense : bc.isWallet ? themeColors.primary : themeColors.info;
+              const darkBg = bc.isCredit ? '#1F1413' : bc.isWallet ? '#10221B' : '#0F1F22';
+              const darkBorder = bc.isCredit
+                ? 'rgba(242, 113, 88, 0.34)'
+                : bc.isWallet
+                ? 'rgba(60, 232, 142, 0.34)'
+                : 'rgba(79, 209, 217, 0.34)';
+              return (
+                <TouchableOpacity
+                  key={bc.id}
+                  activeOpacity={bc.isCredit ? 0.82 : 1}
+                  onPress={() => bc.isCredit && onOpenPayCc && onOpenPayCc(bc.id)}
+                  style={{
+                    width: 215,
+                    backgroundColor: darkBg,
+                    borderRadius: 16,
+                    padding: 12,
+                    borderWidth: 1,
+                    borderColor: darkBorder,
+                  }}
+                >
+                  <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <MaterialCommunityIcons name={bc.isWallet ? 'wallet-bifold' : 'integrated-circuit-chip'} size={19} color={darkAccent} />
+                      <MaterialCommunityIcons name={bc.isWallet ? 'cash-multiple' : 'contactless-payment'} size={15} color="#647A76" />
+                    </View>
+                    <View style={{ backgroundColor: '#131D1B', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: darkBorder }}>
+                      <Text style={{ color: darkAccent, fontSize: 9, fontWeight: '800' }}>{bc.typeBadge}</Text>
+                    </View>
+                  </View>
+
+                  <Text style={{ color: '#F3F7F6', fontSize: 12.5, fontWeight: '800', marginTop: 8, textAlign: isArabic ? 'right' : 'left' }} numberOfLines={1}>
+                    {bc.title}
+                  </Text>
+                  <Text style={{ color: '#647A76', fontSize: 10, letterSpacing: 1, marginTop: 1, textAlign: isArabic ? 'right' : 'left' }}>
+                    {bc.digits}
+                  </Text>
+
+                  <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 8 }}>
+                    <Text style={{ color: darkAccent, fontSize: 17, fontWeight: '900' }}>
+                      {formatAmount(bc.amount)} <Text style={{ fontSize: 11, color: '#9BB0AC' }}>{currency.symbol}</Text>
+                    </Text>
+                    {bc.isCredit && (
+                      <Text style={{ color: themeColors.primary, fontSize: 10, fontWeight: '800' }}>
+                        {isArabic ? 'سداد 💳' : 'Pay 💳'}
+                      </Text>
+                    )}
+                  </View>
+
+                  <View style={{ height: 4, backgroundColor: '#1B2A27', borderRadius: 3, marginTop: 6, overflow: 'hidden' }}>
+                    <View style={{ width: `${Math.max(5, bc.ratio)}%`, height: '100%', backgroundColor: darkAccent }} />
+                  </View>
+                  <Text style={{ color: '#9BB0AC', fontSize: 9.5, marginTop: 4, textAlign: isArabic ? 'right' : 'left' }} numberOfLines={1}>
+                    {bc.subText}
+                  </Text>
+                </TouchableOpacity>
+              );
+            }
+
             if (bc.isWallet) {
               // Leather Pocket Wallet Design for Cash
               return (
@@ -743,9 +972,9 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
                   <Text style={[styles.accountName, styles.blueArText, isDarkMode && styles.darkBlueArText, isArabic && { textAlign: 'right' }]} numberOfLines={1}>
                     {dCard.bankName}
                   </Text>
-                  <MaterialCommunityIcons name="credit-card-outline" size={15} color={isDarkMode ? '#93BCEF' : '#1E40AF'} />
+                  <MaterialCommunityIcons name="credit-card-outline" size={15} color={isDarkMode ? themeColors.primary : '#1E40AF'} />
                 </View>
-                <Text style={[styles.accountAmount, styles.blueArText, isDarkMode && styles.darkBlueArText]} numberOfLines={1}>
+                <Text style={[styles.accountAmount, styles.blueArText, isDarkMode && { color: themeColors.primary }]} numberOfLines={1}>
                   {formatAmount(dCard.avail)} {currency.symbol}
                 </Text>
                 <Text style={[styles.accountSub, styles.blueArSubText, isDarkMode && styles.darkBlueArSubText]} numberOfLines={1}>
@@ -792,37 +1021,37 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
       {/* 4. Burn Rate & Insights Row */}
       <View style={[styles.insightsRow, isDarkMode && { backgroundColor: themeColors.surfaceSecondary, borderColor: themeColors.border }, isArabic && { flexDirection: 'row-reverse' }]}>
         <View style={styles.insightItem}>
-          <Text style={[styles.insightVal, { color: '#DC2626' }]}>
+          <Text style={[styles.insightVal, { color: isDarkMode ? themeColors.expense : '#DC2626' }]}>
             {formatAmount(balances.totalOutflow)}
           </Text>
-          <Text style={styles.insightLbl} numberOfLines={1}>
+          <Text style={[styles.insightLbl, isDarkMode && { color: themeColors.textSecondary }]} numberOfLines={1}>
             {isArabic ? 'المنصرف' : 'Outflow'}
           </Text>
         </View>
-        <View style={styles.insightDivider} />
+        <View style={[styles.insightDivider, isDarkMode && { backgroundColor: themeColors.border }]} />
         <View style={styles.insightItem}>
-          <Text style={styles.insightVal}>
+          <Text style={[styles.insightVal, isDarkMode && { color: themeColors.textPrimary }]}>
             {formatAmount(balances.realTotalSpent)}
           </Text>
-          <Text style={styles.insightLbl} numberOfLines={1}>
+          <Text style={[styles.insightLbl, isDarkMode && { color: themeColors.textSecondary }]} numberOfLines={1}>
             {isArabic ? 'الاستهلاك' : 'Direct'}
           </Text>
         </View>
-        <View style={styles.insightDivider} />
+        <View style={[styles.insightDivider, isDarkMode && { backgroundColor: themeColors.border }]} />
         <View style={styles.insightItem}>
-          <Text style={styles.insightVal}>
+          <Text style={[styles.insightVal, isDarkMode && { color: themeColors.textPrimary }]}>
             {formatAmount(balances.avgPerDay)}
           </Text>
-          <Text style={styles.insightLbl} numberOfLines={1}>
+          <Text style={[styles.insightLbl, isDarkMode && { color: themeColors.textSecondary }]} numberOfLines={1}>
             {isArabic ? 'المتوسط' : 'Daily'}
           </Text>
         </View>
-        <View style={styles.insightDivider} />
+        <View style={[styles.insightDivider, isDarkMode && { backgroundColor: themeColors.border }]} />
         <View style={styles.insightItem}>
-          <Text style={[styles.insightVal, { color: '#059669' }]}>
+          <Text style={[styles.insightVal, { color: isDarkMode ? themeColors.primary : '#059669' }]}>
             {balances.daysMoneyLasts} {isArabic ? 'يوم' : 'd'}
           </Text>
-          <Text style={styles.insightLbl} numberOfLines={1}>
+          <Text style={[styles.insightLbl, isDarkMode && { color: themeColors.textSecondary }]} numberOfLines={1}>
             {isArabic ? 'يكفي' : 'Lasts'}
           </Text>
         </View>
@@ -832,7 +1061,11 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
       <View style={[styles.actionButtonsContainer, isArabic && { flexDirection: 'row-reverse' }]}>
         {/* Circular Add Expense Button */}
         <TouchableOpacity
-          style={[styles.circularExpenseBtn, SHADOWS.medium]}
+          style={[
+            styles.circularExpenseBtn,
+            SHADOWS.medium,
+            isDarkMode && { backgroundColor: themeColors.expense, borderColor: 'rgba(255, 92, 101, 0.45)' },
+          ]}
           onPress={onOpenAddExpense}
           activeOpacity={0.85}
         >
@@ -846,21 +1079,37 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
         <View style={styles.secondaryActionsCol}>
           <View style={[styles.actionButtonsRow, isArabic && { flexDirection: 'row-reverse' }]}>
             <TouchableOpacity
-              style={[styles.actionBtn, SHADOWS.small, styles.payCcActionBtn, { backgroundColor: themeColors.primaryDark }, isArabic && { flexDirection: 'row-reverse' }]}
+              style={[
+                styles.actionBtn,
+                SHADOWS.small,
+                styles.payCcActionBtn,
+                isDarkMode
+                  ? { backgroundColor: themeColors.surfaceSecondary, borderWidth: 1, borderColor: themeColors.border }
+                  : { backgroundColor: themeColors.primaryDark },
+                isArabic && { flexDirection: 'row-reverse' },
+              ]}
               onPress={() => onOpenPayCc && onOpenPayCc('cc_ar')}
               activeOpacity={0.8}
             >
-              <MaterialCommunityIcons name="credit-card-check" size={15} color={COLORS.textWhite} />
-              <Text style={styles.actionBtnText}>{isArabic ? 'سداد كارت 💳' : 'Pay Card 💳'}</Text>
+              <MaterialCommunityIcons name="credit-card-check" size={15} color={isDarkMode ? themeColors.primary : COLORS.textWhite} />
+              <Text style={[styles.actionBtnText, isDarkMode && { color: themeColors.textPrimary }]}>{isArabic ? 'سداد كارت 💳' : 'Pay Card 💳'}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.actionBtn, SHADOWS.small, styles.incomeActionBtn, { backgroundColor: themeColors.primary }, isArabic && { flexDirection: 'row-reverse' }]}
+              style={[
+                styles.actionBtn,
+                SHADOWS.small,
+                styles.incomeActionBtn,
+                isDarkMode
+                  ? { backgroundColor: themeColors.primary, ...NEON_GLOW.soft }
+                  : { backgroundColor: themeColors.primary },
+                isArabic && { flexDirection: 'row-reverse' },
+              ]}
               onPress={onOpenAddIncome}
               activeOpacity={0.8}
             >
-              <MaterialCommunityIcons name="plus-circle-outline" size={15} color={COLORS.textWhite} />
-              <Text style={styles.actionBtnText}>
+              <MaterialCommunityIcons name="plus-circle-outline" size={15} color={isDarkMode ? '#050505' : COLORS.textWhite} />
+              <Text style={[styles.actionBtnText, isDarkMode && { color: '#050505', fontWeight: '900' }]}>
                 {isArabic ? 'وارد / تحويل' : 'Income / Trns'}
               </Text>
             </TouchableOpacity>
@@ -890,7 +1139,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 13,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#DCE5E1',
     width: '100%',
   },
   // Top Spent & Start Figures side-by-side
@@ -1103,36 +1352,36 @@ const styles = StyleSheet.create({
   blueArSubText: {
     color: '#2563EB',
   },
-  // Soft Dark-Gray Box Themes (for comfortable dark mode)
+  // Sary-inspired Obsidian-Emerald Dark Box Themes (Dark Mode ONLY)
   darkBeigeCard: {
-    backgroundColor: '#36332B',
-    borderColor: '#524B3B',
+    backgroundColor: '#10221B',
+    borderColor: 'rgba(60, 232, 142, 0.30)',
   },
   darkBeigeText: {
-    color: '#EAD7A7',
+    color: '#3CE88E',
   },
   darkBeigeSubText: {
-    color: '#C7B485',
+    color: '#9BB0AC',
   },
   darkGreenCaCard: {
-    backgroundColor: '#283630',
-    borderColor: '#3B564A',
+    backgroundColor: '#1F1413',
+    borderColor: 'rgba(242, 113, 88, 0.32)',
   },
   darkGreenCaText: {
-    color: '#A7E3C5',
+    color: '#F27158',
   },
   darkGreenCaSubText: {
-    color: '#82C2A3',
+    color: '#9BB0AC',
   },
   darkBlueArCard: {
-    backgroundColor: '#293240',
-    borderColor: '#3E4F69',
+    backgroundColor: '#0F1F22',
+    borderColor: 'rgba(79, 209, 217, 0.32)',
   },
   darkBlueArText: {
-    color: '#B5D2F7',
+    color: '#4FD1D9',
   },
   darkBlueArSubText: {
-    color: '#8EB2E0',
+    color: '#9BB0AC',
   },
   accountTop: {
     flexDirection: 'row',
@@ -1159,25 +1408,30 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+    gap: 6,
+    width: '100%',
   },
   carouselSectionTitle: {
-    fontSize: 11.5,
+    flex: 1,
+    flexShrink: 1,
+    fontSize: 11,
     fontWeight: '800',
     color: COLORS.textSecondary,
   },
   carouselToggleBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 8,
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 7,
     backgroundColor: '#F0FDF4',
     borderWidth: 1,
     borderColor: '#BBF7D0',
+    flexShrink: 0,
   },
   carouselToggleText: {
-    fontSize: 10.5,
+    fontSize: 9.5,
     fontWeight: '800',
   },
   // Insights Row
@@ -1189,7 +1443,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: '#EBF0EE',
     ...SHADOWS.small,
   },
   insightItem: {

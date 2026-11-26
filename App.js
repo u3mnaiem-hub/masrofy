@@ -16,7 +16,7 @@ import { HomeScreen } from './src/screens/HomeScreen';
 import { InsightsScreen } from './src/screens/InsightsScreen';
 import { HistoryScreen } from './src/screens/HistoryScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
-import { COLORS } from './src/constants/theme';
+import { COLORS, NEON_GLOW } from './src/constants/theme';
 
 function MainApp() {
   const [activeTab, setActiveTab] = useState('home');
@@ -221,8 +221,8 @@ function MainApp() {
   ];
 
   return (
-    <View style={[styles.container, isDarkMode && { backgroundColor: '#0F172A' }]}>
-      <StatusBar style={isDarkMode ? 'light' : 'dark'} backgroundColor={isDarkMode ? '#0F172A' : COLORS.background} />
+    <View style={[styles.container, isDarkMode && { backgroundColor: themeColors.background }]}>
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} backgroundColor={isDarkMode ? themeColors.background : COLORS.background} />
       {/* Active Screen View */}
       <View style={styles.screenContainer}>{renderScreen()}</View>
 
@@ -231,7 +231,7 @@ function MainApp() {
         style={[
           styles.bottomNav,
           isArabic && { flexDirection: 'row-reverse' },
-          isDarkMode && { backgroundColor: '#1E293B', borderTopColor: '#334155' },
+          isDarkMode && { backgroundColor: themeColors.surface, borderTopColor: themeColors.border },
           { paddingBottom: Math.max(insets.bottom, 12) + 8 },
         ]}
       >
@@ -247,19 +247,22 @@ function MainApp() {
               <View
                 style={[
                   styles.iconWrap,
-                  isActive && { backgroundColor: isDarkMode ? themeColors.primaryLight : (themeColors.primaryUltraLight || themeColors.primaryLight) },
+                  isActive && {
+                    backgroundColor: isDarkMode ? themeColors.primaryLight : (themeColors.primaryUltraLight || themeColors.primaryLight),
+                    ...(isDarkMode ? { borderWidth: 1, borderColor: 'rgba(60, 232, 142, 0.35)', ...NEON_GLOW.soft } : {}),
+                  },
                 ]}
               >
                 <MaterialCommunityIcons
                   name={isActive ? tab.activeIcon : tab.icon}
                   size={22}
-                  color={isActive ? (isDarkMode ? themeColors.primary : themeColors.primaryDark) : (isDarkMode ? '#94A3B8' : COLORS.textMuted)}
+                  color={isActive ? (isDarkMode ? themeColors.primary : themeColors.primaryDark) : (isDarkMode ? themeColors.textMuted : COLORS.textMuted)}
                 />
               </View>
               <Text
                 style={[
                   styles.navLabel,
-                  isDarkMode && { color: '#94A3B8' },
+                  isDarkMode && { color: themeColors.textMuted },
                   isActive && { color: isDarkMode ? themeColors.primary : themeColors.primaryDark, fontWeight: '800' },
                 ]}
               >

@@ -115,58 +115,53 @@ export const InsightsScreen = () => {
         >
           <View style={{ flex: 1, width: '100%', gap: 14 }}>
         {/* 1. TOP KPI BANNER */}
-        <View style={[styles.kpiContainer, SHADOWS.medium]}>
-          <Text style={[styles.kpiMainTitle, { textAlign: 'center' }]}>
+        <View style={[styles.kpiContainer, SHADOWS.medium, isDarkMode && { backgroundColor: themeColors.surface, borderColor: themeColors.border, borderWidth: 1 }]}>
+          <Text style={[styles.kpiMainTitle, { textAlign: 'center' }, isDarkMode && { color: themeColors.textPrimary }]}>
             {isArabic ? 'مؤشرات الأداء اللحظية • Live Insights' : 'Live Performance Indicators • Real-Time'}
           </Text>
 
-          {/* KPI Blocks arranged exactly as requested:
-              1. Top Center: إجمالي السيولة الخارجة (Full Width)
-              2. Middle Row: المصروف الفعلي & المتوسط اليومي (Side by Side)
-              3. Bottom Center: المتبقي بعد الكروت (Full Width)
-          */}
           <View style={styles.kpiStructuredContainer}>
-            {/* 1. إجمالي السيولة الخارجة (في النص لوحده) */}
-            <View style={[styles.kpiCardFull, { borderColor: '#FECACA', backgroundColor: '#FEF2F2' }]}>
-              <Text style={[styles.kpiValLarge, { color: '#DC2626' }]}>
+            {/* 1. إجمالي السيولة الخارجة (Coral-Red card like Expenses in reference image) */}
+            <View style={[styles.kpiCardFull, isDarkMode ? { borderColor: 'rgba(242, 113, 88, 0.38)', backgroundColor: themeColors.expenseLight } : { borderColor: '#FECACA', backgroundColor: '#FEF2F2' }]}>
+              <Text style={[styles.kpiValLarge, { color: isDarkMode ? themeColors.expense : '#DC2626' }]}>
                 {formatAmount(balances.totalOutflow)} {currency.symbol}
               </Text>
-              <Text style={styles.kpiLbl}>
+              <Text style={[styles.kpiLbl, isDarkMode && { color: themeColors.textSecondary }]}>
                 {isArabic ? 'إجمالي السيولة الخارجة (Total Outflow)' : 'Total Outflow'}
               </Text>
             </View>
 
-            {/* 2. المصروف الفعلي & المتوسط اليومي جنب بعض */}
+            {/* 2. المصروف الفعلي & المتوسط اليومي (Cyan-Teal cards like Revenue in reference image) */}
             <View style={[styles.kpiRowSideBySide, isArabic && { flexDirection: 'row-reverse' }]}>
-              <View style={[styles.kpiCardHalf, { flex: 1 }]}>
-                <Text style={styles.kpiVal}>{formatAmount(balances.realTotalSpent)} {currency.symbol}</Text>
-                <Text style={styles.kpiLbl}>
+              <View style={[styles.kpiCardHalf, { flex: 1 }, isDarkMode && { backgroundColor: themeColors.infoLight, borderColor: 'rgba(79, 209, 217, 0.34)' }]}>
+                <Text style={[styles.kpiVal, isDarkMode && { color: themeColors.info }]}>{formatAmount(balances.realTotalSpent)} {currency.symbol}</Text>
+                <Text style={[styles.kpiLbl, isDarkMode && { color: themeColors.textSecondary }]}>
                   {isArabic ? 'المصروف الفعلي' : 'Actual Spent'}
                 </Text>
               </View>
 
-              <View style={[styles.kpiCardHalf, { flex: 1 }]}>
-                <Text style={styles.kpiVal}>{formatAmount(balances.avgPerDay)} {currency.symbol}</Text>
-                <Text style={styles.kpiLbl}>{isArabic ? 'المتوسط اليومي' : 'Daily Average'}</Text>
+              <View style={[styles.kpiCardHalf, { flex: 1 }, isDarkMode && { backgroundColor: themeColors.infoLight, borderColor: 'rgba(79, 209, 217, 0.34)' }]}>
+                <Text style={[styles.kpiVal, isDarkMode && { color: themeColors.info }]}>{formatAmount(balances.avgPerDay)} {currency.symbol}</Text>
+                <Text style={[styles.kpiLbl, isDarkMode && { color: themeColors.textSecondary }]}>{isArabic ? 'المتوسط اليومي' : 'Daily Average'}</Text>
               </View>
             </View>
 
             {/* 3. المتبقي بعد الكروت (تحت لوحده في النص) */}
-            <View style={[styles.kpiCardFull, { borderColor: '#BFDBFE', backgroundColor: '#EFF6FF' }]}>
-              <Text style={[styles.kpiValLarge, { color: '#2563EB' }]}>
+            <View style={[styles.kpiCardFull, isDarkMode ? { borderColor: 'rgba(0, 230, 118, 0.35)', backgroundColor: themeColors.primaryLight } : { borderColor: '#BFDBFE', backgroundColor: '#EFF6FF' }]}>
+              <Text style={[styles.kpiValLarge, { color: isDarkMode ? themeColors.primary : '#2563EB' }]}>
                 {formatAmount(balances.netAvailableAfterCards)} {currency.symbol}
               </Text>
-              <Text style={styles.kpiLbl}>{isArabic ? 'المتبقي بعد الكروت (Net Left After Cards)' : 'Net Left After Cards'}</Text>
+              <Text style={[styles.kpiLbl, isDarkMode && { color: themeColors.textSecondary }]}>{isArabic ? 'المتبقي بعد الكروت (Net Left After Cards)' : 'Net Left After Cards'}</Text>
             </View>
           </View>
 
-          <View style={[styles.onTrackBanner, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={[styles.onTrackBanner, isDarkMode && { backgroundColor: themeColors.surfaceSecondary, borderColor: themeColors.border, borderWidth: 1 }, isArabic && { flexDirection: 'row-reverse' }]}>
             <MaterialCommunityIcons
               name={balances.daysMoneyLasts >= balances.daysLeft ? 'check-decagram' : 'alert-circle'}
               size={18}
-              color={balances.daysMoneyLasts >= balances.daysLeft ? '#059669' : '#DC2626'}
+              color={balances.daysMoneyLasts >= balances.daysLeft ? (isDarkMode ? themeColors.primary : '#059669') : (isDarkMode ? themeColors.expense : '#DC2626')}
             />
-            <Text style={[styles.onTrackText, isArabic && { textAlign: 'right' }]}>
+            <Text style={[styles.onTrackText, isDarkMode && { color: themeColors.textPrimary }, isArabic && { textAlign: 'right' }]}>
               {balances.daysMoneyLasts >= balances.daysLeft
                 ? isArabic
                   ? `✅ وضعك ممتاز وآمن — الرصيد يكفي لـ ${balances.daysMoneyLasts} يوماً قادمة بمعدل الصرف الحالي`
@@ -184,18 +179,29 @@ export const InsightsScreen = () => {
             <Text style={[styles.cardTitle, isDarkMode && { color: themeColors.textPrimary }]}>
               {isArabic ? 'مقارنة ذكية بين الشهور 📈' : 'Month-over-Month Smart Comparison 📈'}
             </Text>
-            <Text style={styles.cardSub}>
+            <Text style={[styles.cardSub, isDarkMode && { color: themeColors.textSecondary }]}>
               {monthComparison.prevLabel}
             </Text>
           </View>
-          <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: monthComparison.isSaving ? '#ECFDF5' : '#FEF2F2', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: monthComparison.isSaving ? '#6EE7B7' : '#FECACA' }}>
+          <View
+            style={{
+              flexDirection: isArabic ? 'row-reverse' : 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              backgroundColor: isDarkMode ? themeColors.surfaceSecondary : (monthComparison.isSaving ? '#ECFDF5' : '#FEF2F2'),
+              padding: 12,
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: isDarkMode ? themeColors.border : (monthComparison.isSaving ? '#6EE7B7' : '#FECACA'),
+            }}
+          >
             <View style={{ flex: 1, alignItems: isArabic ? 'flex-end' : 'flex-start' }}>
-              <Text style={{ fontSize: 13, fontWeight: '900', color: monthComparison.isSaving ? '#047857' : '#B91C1C' }}>
+              <Text style={{ fontSize: 13, fontWeight: '900', color: isDarkMode ? (monthComparison.isSaving ? themeColors.primary : themeColors.expense) : (monthComparison.isSaving ? '#047857' : '#B91C1C') }}>
                 {monthComparison.isSaving
                   ? (isArabic ? `🎉 وفرت ${monthComparison.diffPct}% مقارنة بالشهر السابق!` : `🎉 Saved ${monthComparison.diffPct}% vs Previous Month!`)
                   : (isArabic ? `⚠️ زيادة ${monthComparison.diffPct}% عن الشهر السابق` : `⚠️ Up ${monthComparison.diffPct}% vs Previous Month`)}
               </Text>
-              <Text style={{ fontSize: 11.5, color: '#475569', marginTop: 3 }}>
+              <Text style={{ fontSize: 11.5, color: isDarkMode ? themeColors.textSecondary : '#475569', marginTop: 3 }}>
                 {isArabic
                   ? `الشهر الحالي: ${formatAmount(monthComparison.curTotal)} ${currency.symbol} • السابق: ${formatAmount(monthComparison.prevTotal)} ${currency.symbol}`
                   : `Current: ${formatAmount(monthComparison.curTotal)} ${currency.symbol} • Previous: ${formatAmount(monthComparison.prevTotal)} ${currency.symbol}`}
@@ -204,41 +210,41 @@ export const InsightsScreen = () => {
             <MaterialCommunityIcons
               name={monthComparison.isSaving ? 'trending-down' : 'trending-up'}
               size={28}
-              color={monthComparison.isSaving ? '#059669' : '#DC2626'}
+              color={isDarkMode ? (monthComparison.isSaving ? themeColors.primary : themeColors.expense) : (monthComparison.isSaving ? '#059669' : '#DC2626')}
             />
           </View>
         </View>
 
         {/* 2. WHERE THE MONEY GOES */}
-        <View style={[styles.card, SHADOWS.small]}>
+        <View style={[styles.card, SHADOWS.small, isDarkMode && { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
           <View style={[styles.cardHeader, isArabic && { alignItems: 'flex-end' }]}>
-            <Text style={styles.cardTitle}>
+            <Text style={[styles.cardTitle, isDarkMode && { color: themeColors.textPrimary }]}>
               {isArabic ? 'أين تذهب الأموال؟' : 'Where the Money Goes'}
             </Text>
-            <Text style={styles.cardSub}>
+            <Text style={[styles.cardSub, isDarkMode && { color: themeColors.textSecondary }]}>
               {isArabic ? 'أكثر البنود استهلاكاً بالأرقام والنسب' : 'Top spending categories by amount & share'}
             </Text>
           </View>
 
           {/* Top Category Callout */}
           {topCategory && (
-            <View style={[styles.topCallout, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[styles.topCallout, isDarkMode && { backgroundColor: themeColors.surfaceSecondary, borderColor: themeColors.border }, isArabic && { flexDirection: 'row-reverse' }]}>
               <View style={[styles.topCalloutLeft, isArabic && { flexDirection: 'row-reverse' }]}>
-                <View style={[styles.badgeIcon, { backgroundColor: topCategory.category.color }]}>
-                  <MaterialCommunityIcons name={topCategory.category.icon} size={20} color="#FFFFFF" />
+                <View style={[styles.badgeIcon, { backgroundColor: isDarkMode ? themeColors.primaryLight : topCategory.category.color }]}>
+                  <MaterialCommunityIcons name={topCategory.category.icon} size={20} color={isDarkMode ? themeColors.primary : '#FFFFFF'} />
                 </View>
                 <View style={isArabic ? { alignItems: 'flex-end' } : undefined}>
-                  <Text style={styles.topCalloutBadge}>
+                  <Text style={[styles.topCalloutBadge, isDarkMode && { color: themeColors.primary }]}>
                     {isArabic ? 'أعلى بند استهلاك' : 'Highest Category'}
                   </Text>
-                  <Text style={styles.topCalloutName}>{topCategory.category.name}</Text>
+                  <Text style={[styles.topCalloutName, isDarkMode && { color: themeColors.textPrimary }]}>{topCategory.category.name}</Text>
                 </View>
               </View>
               <View style={[styles.topCalloutRight, isArabic && { alignItems: 'flex-start' }]}>
-                <Text style={styles.topCalloutAmt}>
+                <Text style={[styles.topCalloutAmt, isDarkMode && { color: themeColors.expense }]}>
                   {formatAmount(topCategory.total)} {currency.symbol}
                 </Text>
-                <Text style={styles.topCalloutPct}>
+                <Text style={[styles.topCalloutPct, isDarkMode && { color: themeColors.textSecondary }]}>
                   {Math.round(topCategory.percentage)}% {isArabic ? 'من إجمالي الصرف' : 'of total spend'}
                 </Text>
               </View>

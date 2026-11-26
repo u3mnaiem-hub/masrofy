@@ -5,7 +5,7 @@ import { COLORS, SHADOWS } from '../constants/theme';
 import { getCategoryById, getPaymentMethodById } from '../constants/categories';
 import { useExpense, getGracePeriodStats } from '../context/ExpenseContext';
 
-export const TransactionItem = ({ item, onEdit }) => {
+export const TransactionItem = ({ item, onEdit, onDelete }) => {
   const [receiptPreviewVisible, setReceiptPreviewVisible] = useState(false);
   const {
     deleteTransaction,
@@ -129,7 +129,7 @@ export const TransactionItem = ({ item, onEdit }) => {
         {
           text: isArabic ? 'حذف' : 'Delete',
           style: 'destructive',
-          onPress: () => deleteTransaction(item.id),
+          onPress: () => (onDelete ? onDelete(item) : deleteTransaction(item.id)),
         },
       ]
     );
@@ -195,13 +195,13 @@ export const TransactionItem = ({ item, onEdit }) => {
               paddingHorizontal: 8,
               paddingVertical: 3,
               borderRadius: 6,
-              backgroundColor: '#ECFDF5',
+              backgroundColor: isDarkMode ? themeColors.primaryLight : '#ECFDF5',
               borderWidth: 1,
-              borderColor: '#6EE7B7',
+              borderColor: isDarkMode ? 'rgba(0, 230, 118, 0.35)' : '#6EE7B7',
             }}
           >
-            <MaterialCommunityIcons name="receipt" size={12} color="#059669" />
-            <Text style={{ fontSize: 10, fontWeight: '800', color: '#059669' }}>
+            <MaterialCommunityIcons name="receipt" size={12} color={isDarkMode ? themeColors.primary : '#059669'} />
+            <Text style={{ fontSize: 10, fontWeight: '800', color: isDarkMode ? themeColors.primary : '#059669' }}>
               {isArabic ? 'عرض صورة الفاتورة 🧾' : 'View Receipt 🧾'}
             </Text>
           </TouchableOpacity>
@@ -211,23 +211,23 @@ export const TransactionItem = ({ item, onEdit }) => {
           <View style={[styles.settleActionRow, isArabic && { flexDirection: 'row-reverse' }]}>
             {item.isPaid ? (
               <TouchableOpacity
-                style={[styles.settledBadge, isArabic && { flexDirection: 'row-reverse' }]}
+                style={[styles.settledBadge, isDarkMode && { backgroundColor: themeColors.primaryLight, borderColor: 'rgba(0, 230, 118, 0.35)' }, isArabic && { flexDirection: 'row-reverse' }]}
                 onPress={handleUnsettlePress}
                 activeOpacity={0.7}
               >
-                <MaterialCommunityIcons name="check-circle" size={12} color="#15803D" />
-                <Text style={styles.settledBadgeText}>
+                <MaterialCommunityIcons name="check-circle" size={12} color={isDarkMode ? themeColors.primary : '#15803D'} />
+                <Text style={[styles.settledBadgeText, isDarkMode && { color: themeColors.primary }]}>
                   {isArabic ? 'مسددة ✓' : 'Settled ✓'}
                 </Text>
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
-                style={[styles.settleButton, isArabic && { flexDirection: 'row-reverse' }]}
+                style={[styles.settleButton, isDarkMode && { backgroundColor: themeColors.surfaceSecondary, borderColor: themeColors.border }, isArabic && { flexDirection: 'row-reverse' }]}
                 onPress={handleSettlePress}
                 activeOpacity={0.75}
               >
-                <MaterialCommunityIcons name="credit-card-check-outline" size={13} color="#1D4ED8" />
-                <Text style={styles.settleButtonText}>
+                <MaterialCommunityIcons name="credit-card-check-outline" size={13} color={isDarkMode ? themeColors.primary : '#1D4ED8'} />
+                <Text style={[styles.settleButtonText, isDarkMode && { color: themeColors.primary }]}>
                   {isArabic ? 'سداد المعاملة 💳' : 'Settle 💳'}
                 </Text>
               </TouchableOpacity>

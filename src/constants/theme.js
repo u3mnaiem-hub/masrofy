@@ -1,109 +1,141 @@
+// تعديل الوان 999 — Executive Banking Light Mode Palette (Light Mode ONLY)
 export const COLORS = {
-  // Brand colors
-  primary: '#10B981',         // Emerald Green
-  primaryDark: '#059669',
-  primaryLight: '#D1FAE5',
-  primaryUltraLight: '#ECFDF5',
+  // Brand colors — Refined Private Banking Teal-Emerald
+  primary: '#0F766E',         // Deep Banking Teal
+  primaryDark: '#115E59',     // Executive Deep Pine-Teal
+  primaryLight: '#E6F4F1',    // Soft Whisper Teal
+  primaryUltraLight: '#F0FAF8',
 
-  // Semantic
-  expense: '#EF4444',        // Bright Red
-  expenseLight: '#FEE2E2',
-  expenseDark: '#B91C1C',
+  // Semantic financial colors
+  expense: '#C81E1E',         // Refined Banking Crimson
+  expenseLight: '#FDF2F2',
+  expenseDark: '#9B1C1C',
 
-  income: '#10B981',         // Green
-  incomeLight: '#D1FAE5',
-  incomeDark: '#047857',
+  income: '#047857',          // Classic Banking Forest Green
+  incomeLight: '#E6F4F1',
+  incomeDark: '#065F46',
 
-  warning: '#F59E0B',        // Amber
-  warningLight: '#FEF3C7',
+  warning: '#B45309',         // Muted Banking Amber
+  warningLight: '#FEF9EC',
 
-  info: '#3B82F6',           // Blue
-  infoLight: '#DBEAFE',
+  info: '#1E3A5F',            // Executive Banking Navy
+  infoLight: '#EEF2F6',
 
-  // Neutrals & Surfaces
-  background: '#F8FAFC',
+  // Neutrals & Surfaces — Calm Banking Mist + Crisp White Cards
+  background: '#F2F6F4',
   surface: '#FFFFFF',
-  surfaceSecondary: '#F1F5F9',
-  border: '#E2E8F0',
-  borderLight: '#F1F5F9',
+  surfaceSecondary: '#EDF2F0',
+  border: '#DCE5E1',
+  borderLight: '#EBF0EE',
 
   // Typography
   textPrimary: '#0F172A',
   textSecondary: '#475569',
-  textMuted: '#94A3B8',
+  textMuted: '#8392A5',
   textWhite: '#FFFFFF',
 
   // Accents
-  purple: '#8B5CF6',
-  purpleLight: '#EDE9FE',
-  pink: '#EC4899',
-  pinkLight: '#FCE7F3',
-  teal: '#14B8A6',
-  tealLight: '#CCFBF1',
-  indigo: '#6366F1',
-  indigoLight: '#E0E7FF',
+  purple: '#5B4B8A',
+  purpleLight: '#F3F1FA',
+  pink: '#BE185D',
+  pinkLight: '#FDF2F8',
+  teal: '#0F766E',
+  tealLight: '#E6F4F1',
+  indigo: '#1E3A5F',
+  indigoLight: '#EEF2F6',
 };
 
 export const LIGHT_COLORS = { ...COLORS };
 
 export const DARK_COLORS = {
-  // Brand colors (softened for comfortable dark-gray mode)
-  primary: '#34D399',
-  primaryDark: '#10B981',
-  primaryLight: '#1E3A32',
-  primaryUltraLight: '#1B2E29',
+  // Brand colors — Inspired by the attached Sary Dashboard (Obsidian-Emerald Glass + Mint Green + Cyan-Teal + Coral)
+  primary: '#3CE88E',           // Luminous Mint-Emerald Green (Net Profit / Available)
+  primaryDark: '#22C574',
+  primaryLight: '#10241C',      // Subtle emerald-tinted dark glass
+  primaryUltraLight: '#0C1B15',
 
-  // Semantic
-  expense: '#F87171',
-  expenseLight: '#3B2326',
-  expenseDark: '#EF4444',
+  // Semantic financial colors matching the 3 KPI cards in the reference image
+  expense: '#F27158',           // Warm Coral-Red (Expenses / Card Debts)
+  expenseLight: '#241412',      // Subtle coral-tinted dark glass
+  expenseDark: '#D9533D',
 
-  income: '#4ADE80',
-  incomeLight: '#1E3A32',
-  incomeDark: '#22C55E',
+  income: '#3CE88E',            // Luminous Mint-Emerald Green
+  incomeLight: '#10241C',
+  incomeDark: '#22C574',
 
-  warning: '#FBBF24',
-  warningLight: '#3A301F',
+  warning: '#F2A950',           // Soft warm amber
+  warningLight: '#231C12',
 
-  info: '#60A5FA',
-  infoLight: '#233044',
+  info: '#4FD1D9',              // Luminous Cyan-Teal (Revenue / Starting Base / Bank)
+  infoLight: '#0E2124',         // Subtle cyan-teal dark glass
 
-  // Neutrals & Surfaces - Soft Neutral Gray (not harsh black)
-  background: '#222428',
-  surface: '#2C2F35',
-  surfaceSecondary: '#363A42',
-  border: '#454A54',
-  borderLight: '#33373F',
+  // Deep Obsidian-Emerald Surfaces (from the reference image)
+  background: '#0B1211',        // Deep obsidian canvas with subtle emerald depth
+  surface: '#131D1B',           // Dark glass card surface
+  surfaceSecondary: '#192623',  // Elevated inner pill / input / secondary surface
+  border: '#243632',            // Thin dark emerald-charcoal border
+  borderLight: '#1B2A27',
 
-  // Typography
-  textPrimary: '#E5E7EB',
-  textSecondary: '#B4BAC4',
-  textMuted: '#8B929E',
-  textWhite: '#F3F4F6',
+  // High-contrast Typography
+  textPrimary: '#F3F7F6',       // Crisp soft white
+  textSecondary: '#9BB0AC',     // Cool soft gray-mint
+  textMuted: '#647A76',
+  textWhite: '#FFFFFF',
 
-  // Accents (muted so boxes aren't glaring)
-  purple: '#A78BFA',
-  purpleLight: '#2E2842',
-  pink: '#F472B6',
-  pinkLight: '#3D2535',
-  teal: '#2DD4BF',
-  tealLight: '#1F3738',
-  indigo: '#818CF8',
-  indigoLight: '#272B42',
+  // Harmonized accents matching the reference charts (Emerald + Cyan-Teal)
+  purple: '#4FD1D9',
+  purpleLight: '#112326',
+  pink: '#F27158',
+  pinkLight: '#241412',
+  teal: '#4FD1D9',
+  tealLight: '#0E2124',
+  indigo: '#4FD1D9',
+  indigoLight: '#112326',
+};
+
+export const NEON_GLOW = {
+  subtle: {
+    shadowColor: '#3CE88E',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.30,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  soft: {
+    shadowColor: '#3CE88E',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.20,
+    shadowRadius: 7,
+    elevation: 4,
+  },
+  cyan: {
+    shadowColor: '#4FD1D9',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.22,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  coral: {
+    shadowColor: '#F27158',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.22,
+    shadowRadius: 8,
+    elevation: 5,
+  },
 };
 
 export const COLOR_PALETTES = {
   emerald: {
     id: 'emerald',
-    nameAr: 'الأخضر الزمردي',
-    nameEn: 'Emerald',
-    primary: '#10B981',
-    primaryDark: '#059669',
-    primaryLight: '#D1FAE5',
-    primaryUltraLight: '#ECFDF5',
-    darkPrimary: '#34D399',
-    darkPrimaryDark: '#10B981',
-    darkPrimaryLight: '#1E3A32',
+    nameAr: 'بنكي زمردي فاخر (999)',
+    nameEn: 'Executive Banking Teal (999)',
+    primary: '#0F766E',
+    primaryDark: '#115E59',
+    primaryLight: '#E6F4F1',
+    primaryUltraLight: '#F0FAF8',
+    darkPrimary: '#3CE88E',
+    darkPrimaryDark: '#22C574',
+    darkPrimaryLight: '#10241C',
   },
   royalBlue: {
     id: 'royalBlue',
@@ -144,15 +176,11 @@ export const COLOR_PALETTES = {
 };
 
 export const getThemeColors = (isDarkMode, paletteId = 'emerald') => {
-  const pal = COLOR_PALETTES[paletteId] || COLOR_PALETTES.emerald;
   if (isDarkMode) {
-    return {
-      ...DARK_COLORS,
-      primary: pal.darkPrimary,
-      primaryDark: pal.darkPrimaryDark,
-      primaryLight: pal.darkPrimaryLight,
-    };
+    // Dark Mode ALWAYS uses the unified Pure Black & Neon Green futuristic identity
+    return { ...DARK_COLORS };
   }
+  const pal = COLOR_PALETTES[paletteId] || COLOR_PALETTES.emerald;
   return {
     ...COLORS,
     primary: pal.primary,

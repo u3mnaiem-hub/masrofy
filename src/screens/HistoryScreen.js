@@ -33,6 +33,10 @@ export const HistoryScreen = () => {
     getAccountById,
     archivedMonths,
     deleteArchivedMonth,
+    updateArchivedMonthDates,
+    addArchivedTransaction,
+    updateArchivedTransaction,
+    deleteArchivedTransaction,
     isDarkMode,
     themeColors,
   } = useExpense();
@@ -43,10 +47,47 @@ export const HistoryScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all'); // 'all', 'expense', 'cards', 'income'
 
-  // Modal to inspect a selected archived month's full transactions
-  const [selectedArchive, setSelectedArchive] = useState(null);
+  // Modal to inspect & edit a selected archived month's dates and transactions
+  const [selectedArchiveId, setSelectedArchiveId] = useState(null);
+  const selectedArchive = useMemo(
+    () => (archivedMonths || []).find((a) => a.id === selectedArchiveId) || null,
+    [archivedMonths, selectedArchiveId]
+  );
   const [archiveSearch, setArchiveSearch] = useState('');
+  const [editingDatesOpen, setEditingDatesOpen] = useState(false);
+  const [editStartDate, setEditStartDate] = useState('');
+  const [editEndDate, setEditEndDate] = useState('');
   const [editingTransaction, setEditingTransaction] = useState(null);
+  // Archive transaction add/edit modal state: { mode: 'add' | 'edit', tx: null | txObj }
+  const [archiveTxModal, setArchiveTxModal] = useState(null);
+
+  const openArchiveDetails = (item) => {
+    setSelectedArchiveId(item.id);
+    setEditStartDate(item.cycleStartDate || '');
+    setEditEndDate(item.cycleEndDate || '');
+    setEditingDatesOpen(false);
+    setArchiveSearch('');
+  };
+
+  const handleSaveArchiveDates = async () => {
+    if (!selectedArchive) return;
+    const s = (editStartDate || '').trim();
+    const e = (editEndDate || '').trim();
+    const isValid = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d) && !isNaN(new Date(d).getTime());
+    if (!isValid(s) || !isValid(e)) {
+      Alert.alert(
+        isArabic ? 'تاريخ غير صحيح' : 'Invalid Date',
+        isArabic ? 'يرجى إدخال التاريخ بصيغة YYYY-MM-DD (مثال: 2026-10-22)' : 'Please enter dates as YYYY-MM-DD (e.g. 2026-10-22)'
+      );
+      return;
+    }
+    await updateArchivedMonthDates(selectedArchive.id, { cycleStartDate: s, cycleEndDate: e });
+    setEditingDatesOpen(false);
+    Alert.alert(
+      isArabic ? 'تم تحديث التواريخ ✅' : 'Dates Updated ✅',
+      isArabic ? `تم تحديث فترة الشهر المؤرشف إلى ${s} ➔ ${e}` : `Updated archived cycle dates to ${s} ➔ ${e}`
+    );
+  };
 
   // Filtered transactions for CURRENT month (always sorted newest-first)
   const filteredList = useMemo(() => {
@@ -114,7 +155,7 @@ export const HistoryScreen = () => {
           style: 'destructive',
           onPress: async () => {
             await deleteArchivedMonth(item.id);
-            if (selectedArchive?.id === item.id) setSelectedArchive(null);
+            if (selectedArchiveId === item.id) setSelectedArchiveId(null);
           },
         },
       ]
@@ -287,14 +328,14 @@ export const HistoryScreen = () => {
             contentContainerStyle={{ minWidth: Math.max(winWidth - 32, 340), width: '100%' }}
           >
             <View style={{ flex: 1, width: '100%' }}>
-              <View style={[styles.archiveIntroCard, isArabic && { alignItems: 'flex-end' }]}>
+              <View style={[styles.archiveIntroCard, isDarkMode && { backgroundColor: themeColors.surface, borderColor: themeColors.border }, isArabic && { alignItems: 'flex-end' }]}>
                 <View style={[styles.archiveIntroHeader, isArabic && { flexDirection: 'row-reverse' }]}>
-                  <MaterialCommunityIcons name="folder-text" size={24} color="#1D4ED8" />
-                  <Text style={styles.archiveIntroTitle}>
+                  <MaterialCommunityIcons name="folder-text" size={24} color={isDarkMode ? themeColors.primary : '#1D4ED8'} />
+                  <Text style={[styles.archiveIntroTitle, isDarkMode && { color: themeColors.textPrimary }]}>
                     {isArabic ? 'ملف أرشيف الشهور السابقة (History File)' : 'Archived Months History File'}
                   </Text>
                 </View>
-                <Text style={[styles.archiveIntroDesc, isArabic && { textAlign: 'right' }]}>
+                <Text style={[styles.archiveIntroDesc, isDarkMode && { color: themeColors.textSecondary }, isArabic && { textAlign: 'right' }]}>
                   {isArabic
                     ? 'يتم هنا حفظ كافة معاملات وبيانات الشهور السابقة تلقائياً عند الضغط على "ترحيل وفتح شهر جديد"، ويمكنك استعراض كل شهر وتفاصيل معاملاته في أي وقت.'
                     : 'All transactions & metrics of past months are preserved here upon rollover. Tap any month card to view its full transaction record.'}
@@ -304,14 +345,14 @@ export const HistoryScreen = () => {
               {archivedMonths.length > 0 ? (
                 archivedMonths.map((item) => {
                   const txCount = item.transactions?.length || 0;
-                  const outflow = item.balancesSummary?.totalOutflow ?? 0;
-                  const actualSpend = item.balancesSummary?.totalExpense ?? 0;
-                  const finalRem = item.balancesSummary?.finalRemainingBalance ?? 0;
+                  const outflow = item.balancesSummary?.totalOutflow ?? item.totalOutflow ?? 0;
+                  const actualSpend = item.balancesSummary?.totalExpense ?? item.realTotalSpent ?? 0;
+                  const finalRem = item.balancesSummary?.finalRemainingBalance ?? item.netAvailableAfterCards ?? 0;
                   return (
                     <TouchableOpacity
                       key={item.id}
-                      style={[styles.archiveCard, SHADOWS.small]}
-                      onPress={() => setSelectedArchive(item)}
+                      style={[styles.archiveCard, SHADOWS.small, isDarkMode && { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}
+                      onPress={() => openArchiveDetails(item)}
                       activeOpacity={0.8}
                     >
                       <View style={[styles.archiveCardHeader, isArabic && { flexDirection: 'row-reverse' }]}>
@@ -354,7 +395,7 @@ export const HistoryScreen = () => {
                           {isArabic ? `📝 ${txCount} معاملة مسجلة في هذا الشهر` : `📝 ${txCount} transactions recorded`}
                         </Text>
                         <View style={[styles.viewDetailsBadge, isArabic && { flexDirection: 'row-reverse' }]}>
-                          <Text style={styles.viewDetailsText}>{isArabic ? 'عرض المعاملات' : 'View'}</Text>
+                          <Text style={styles.viewDetailsText}>{isArabic ? 'عرض وتعديل' : 'View & Edit'}</Text>
                           <MaterialCommunityIcons
                             name={isArabic ? 'chevron-left' : 'chevron-right'}
                             size={16}
@@ -383,25 +424,25 @@ export const HistoryScreen = () => {
         </ScrollView>
       )}
 
-      {/* INSPECT ARCHIVED MONTH MODAL */}
+      {/* INSPECT & EDIT ARCHIVED MONTH MODAL */}
       <Modal
         visible={!!selectedArchive}
         animationType="slide"
-        onRequestClose={() => setSelectedArchive(null)}
+        onRequestClose={() => setSelectedArchiveId(null)}
       >
-        <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
-          <View style={[styles.archiveModalHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: isDarkMode ? themeColors.background : COLORS.background }}>
+          <View style={[styles.archiveModalHeader, isDarkMode && { backgroundColor: themeColors.surface, borderBottomColor: themeColors.border }, isArabic && { flexDirection: 'row-reverse' }]}>
             <TouchableOpacity
-              onPress={() => setSelectedArchive(null)}
+              onPress={() => setSelectedArchiveId(null)}
               style={styles.closeModalBtn}
             >
-              <MaterialCommunityIcons name="close" size={24} color={COLORS.textPrimary} />
+              <MaterialCommunityIcons name="close" size={24} color={isDarkMode ? themeColors.textPrimary : COLORS.textPrimary} />
             </TouchableOpacity>
             <View style={{ alignItems: 'center', flex: 1 }}>
-              <Text style={styles.archiveModalTitle}>
-                {isArabic ? 'سجل معاملات الشهر المؤرشف' : 'Archived Month Transactions'}
+              <Text style={[styles.archiveModalTitle, isDarkMode && { color: themeColors.textPrimary }]}>
+                {isArabic ? 'تعديل وسجل الشهر المؤرشف' : 'Edit & View Archived Month'}
               </Text>
-              <Text style={styles.archiveModalSub}>
+              <Text style={[styles.archiveModalSub, isDarkMode && { color: themeColors.primary }]}>
                 {selectedArchive?.cycleStartDate} ➔ {selectedArchive?.cycleEndDate}
               </Text>
             </View>
@@ -454,8 +495,80 @@ export const HistoryScreen = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Search inside archive */}
-          <View style={{ paddingHorizontal: 16, paddingTop: 10 }}>
+          {/* Archive Quick Edit Action Bar: Edit Dates + Add Transaction */}
+          <View style={{ paddingHorizontal: 16, paddingTop: 10, gap: 8 }}>
+            <View style={[{ flexDirection: 'row', gap: 8 }, isArabic && { flexDirection: 'row-reverse' }]}>
+              <TouchableOpacity
+                style={[styles.archiveActionChip, { backgroundColor: '#EFF6FF', borderColor: '#93C5FD' }, isArabic && { flexDirection: 'row-reverse' }]}
+                onPress={() => {
+                  if (!editingDatesOpen && selectedArchive) {
+                    setEditStartDate(selectedArchive.cycleStartDate || '');
+                    setEditEndDate(selectedArchive.cycleEndDate || '');
+                  }
+                  setEditingDatesOpen((v) => !v);
+                }}
+                activeOpacity={0.8}
+              >
+                <MaterialCommunityIcons name="calendar-edit" size={16} color="#1D4ED8" />
+                <Text style={[styles.archiveActionChipText, { color: '#1D4ED8' }]}>
+                  {isArabic ? 'تعديل تواريخ الشهر' : 'Edit Month Dates'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.archiveActionChip, { backgroundColor: '#ECFDF5', borderColor: '#6EE7B7' }, isArabic && { flexDirection: 'row-reverse' }]}
+                onPress={() => setArchiveTxModal({ mode: 'add', tx: null })}
+                activeOpacity={0.8}
+              >
+                <MaterialCommunityIcons name="plus-circle-outline" size={16} color="#065F46" />
+                <Text style={[styles.archiveActionChipText, { color: '#065F46' }]}>
+                  {isArabic ? 'إضافة معاملة للأرشيف' : 'Add Transaction'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Collapsible Start/End Date Editor */}
+            {editingDatesOpen && (
+              <View style={styles.archiveDatesEditBox}>
+                <View style={[{ flexDirection: 'row', gap: 8 }, isArabic && { flexDirection: 'row-reverse' }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.archiveDateLbl, isArabic && { textAlign: 'right' }]}>
+                      {isArabic ? 'تاريخ البداية' : 'Start Date'}
+                    </Text>
+                    <TextInput
+                      style={styles.archiveDateInput}
+                      value={editStartDate}
+                      onChangeText={setEditStartDate}
+                      placeholder="YYYY-MM-DD"
+                      placeholderTextColor={COLORS.textMuted}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.archiveDateLbl, isArabic && { textAlign: 'right' }]}>
+                      {isArabic ? 'تاريخ النهاية' : 'End Date'}
+                    </Text>
+                    <TextInput
+                      style={styles.archiveDateInput}
+                      value={editEndDate}
+                      onChangeText={setEditEndDate}
+                      placeholder="YYYY-MM-DD"
+                      placeholderTextColor={COLORS.textMuted}
+                    />
+                  </View>
+                </View>
+                <TouchableOpacity
+                  style={styles.archiveDateSaveBtn}
+                  onPress={handleSaveArchiveDates}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.archiveDateSaveBtnText}>
+                    {isArabic ? 'حفظ تاريخ البداية والنهاية ✓' : 'Save Start & End Dates ✓'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Search inside archive */}
             <View style={[styles.searchBar, isArabic && { flexDirection: 'row-reverse' }]}>
               <MaterialCommunityIcons name="magnify" size={20} color={COLORS.textSecondary} />
               <TextInput
@@ -477,18 +590,27 @@ export const HistoryScreen = () => {
             <View style={[styles.summaryRow, isArabic && { flexDirection: 'row-reverse' }]}>
               <Text style={styles.countText}>
                 {isArabic
-                  ? `العدد: ${selectedArchiveFilteredTxs.length} معاملة (الأحدث بأعلى)`
-                  : `Showing: ${selectedArchiveFilteredTxs.length} (Newest at top)`}
+                  ? `العدد: ${selectedArchiveFilteredTxs.length} معاملة (اضغط تعديل أو حذف على أي معاملة)`
+                  : `Showing: ${selectedArchiveFilteredTxs.length} (Edit or delete any record)`}
               </Text>
               <Text style={styles.sumText}>
                 {isArabic ? 'الاستهلاك: ' : 'Spent: '}
-                {formatAmount(selectedArchive?.balancesSummary?.totalExpense || 0)} {currency.symbol}
+                {formatAmount(selectedArchive?.balancesSummary?.totalExpense ?? selectedArchive?.realTotalSpent ?? 0)} {currency.symbol}
               </Text>
             </View>
 
             {selectedArchiveFilteredTxs.length > 0 ? (
               selectedArchiveFilteredTxs.map((item) => (
-                <TransactionItem key={item.id} item={item} />
+                <TransactionItem
+                  key={item.id}
+                  item={item}
+                  onEdit={(tx) => setArchiveTxModal({ mode: 'edit', tx })}
+                  onDelete={(tx) => {
+                    if (selectedArchive) {
+                      deleteArchivedTransaction(selectedArchive.id, tx.id);
+                    }
+                  }}
+                />
               ))
             ) : (
               <View style={styles.emptyWrap}>
@@ -497,6 +619,22 @@ export const HistoryScreen = () => {
               </View>
             )}
           </ScrollView>
+
+          {/* Add / Edit Transaction inside Archived Month */}
+          <AddTransactionModal
+            visible={!!archiveTxModal}
+            initialType={archiveTxModal?.tx?.type || 'expense'}
+            editingTransaction={archiveTxModal?.mode === 'edit' ? archiveTxModal.tx : null}
+            onClose={() => setArchiveTxModal(null)}
+            onCustomSubmit={async (payload, editedTx) => {
+              if (!selectedArchive) return;
+              if (editedTx && editedTx.id) {
+                await updateArchivedTransaction(selectedArchive.id, editedTx.id, payload);
+              } else {
+                await addArchivedTransaction(selectedArchive.id, payload);
+              }
+            }}
+          />
         </SafeAreaView>
       </Modal>
       {/* Edit Transaction Modal */}
@@ -776,5 +914,57 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textMuted,
     marginTop: 2,
+  },
+  archiveActionChip: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+    borderRadius: 11,
+    borderWidth: 1,
+  },
+  archiveActionChipText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  archiveDatesEditBox: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    borderRadius: 14,
+    padding: 12,
+    gap: 8,
+  },
+  archiveDateLbl: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+    marginBottom: 4,
+  },
+  archiveDateInput: {
+    borderWidth: 1,
+    borderColor: '#93C5FD',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    textAlign: 'center',
+  },
+  archiveDateSaveBtn: {
+    backgroundColor: '#1D4ED8',
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  archiveDateSaveBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
   },
 });

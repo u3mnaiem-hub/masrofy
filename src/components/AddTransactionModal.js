@@ -46,6 +46,7 @@ export const AddTransactionModal = ({
   initialType = 'expense',
   initialTargetCard = 'cc_ar',
   editingTransaction = null,
+  onCustomSubmit = null,
 }) => {
   const {
     addTransaction,
@@ -829,33 +830,31 @@ export const AddTransactionModal = ({
       }
     }
 
-    if (editingTransaction) {
-      await updateTransaction(editingTransaction.id, {
-        type: txType,
-        amount: numericAmount,
-        categoryId: txCategoryId,
-        note: txNote,
-        date: date || editingTransaction.date || new Date().toISOString().split('T')[0],
-        paymentMethod,
-        toAccount: mode === 'switch' ? toAccount : null,
-        targetCard: mode === 'cc_pyd' ? targetCard : null,
-        receiptUri: receiptUri || null,
-      });
-      onClose();
-      return;
-    }
-
-    const saved = await addTransaction({
+    const payload = {
       type: txType,
       amount: numericAmount,
       categoryId: txCategoryId,
       note: txNote,
-      date: date || new Date().toISOString().split('T')[0],
+      date: date || editingTransaction?.date || new Date().toISOString().split('T')[0],
       paymentMethod,
       toAccount: mode === 'switch' ? toAccount : null,
       targetCard: mode === 'cc_pyd' ? targetCard : null,
       receiptUri: receiptUri || null,
-    });
+    };
+
+    if (typeof onCustomSubmit === 'function') {
+      await onCustomSubmit(payload, editingTransaction);
+      onClose();
+      return;
+    }
+
+    if (editingTransaction) {
+      await updateTransaction(editingTransaction.id, payload);
+      onClose();
+      return;
+    }
+
+    const saved = await addTransaction(payload);
 
     onClose();
 

@@ -26,7 +26,7 @@ export const TopSpendingChart = ({ onSeeAll }) => {
         </View>
         {onSeeAll && (
           <TouchableOpacity onPress={onSeeAll}>
-            <Text style={styles.seeAllText}>{isArabic ? 'التفاصيل كاملة' : 'Full Details'}</Text>
+            <Text style={[styles.seeAllText, isDarkMode && { color: themeColors.primary }]}>{isArabic ? 'التفاصيل كاملة' : 'Full Details'}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -36,7 +36,9 @@ export const TopSpendingChart = ({ onSeeAll }) => {
         <View
           style={[
             styles.topSpotlight,
-            { backgroundColor: topCategory.category.bgColor, borderColor: topCategory.category.color },
+            isDarkMode
+              ? { backgroundColor: themeColors.surfaceSecondary, borderColor: themeColors.border }
+              : { backgroundColor: topCategory.category.bgColor, borderColor: topCategory.category.color },
             isArabic && { flexDirection: 'row-reverse' },
           ]}
         >
@@ -46,15 +48,15 @@ export const TopSpendingChart = ({ onSeeAll }) => {
               isArabic ? { flexDirection: 'row-reverse', marginLeft: 8 } : { marginRight: 8 },
             ]}
           >
-            <View style={[styles.spotlightIconBox, { backgroundColor: topCategory.category.color }]}>
-              <MaterialCommunityIcons name={topCategory.category.icon} size={22} color="#FFFFFF" />
+            <View style={[styles.spotlightIconBox, { backgroundColor: isDarkMode ? themeColors.primaryLight : topCategory.category.color }]}>
+              <MaterialCommunityIcons name={topCategory.category.icon} size={22} color={isDarkMode ? themeColors.primary : '#FFFFFF'} />
             </View>
             <View style={[{ flex: 1 }, isArabic && { alignItems: 'flex-end' }]}>
-              <View style={[styles.tagBadge, isArabic && { alignSelf: 'flex-end' }]}>
-                <Text style={styles.tagText}>{isArabic ? 'الأعلى استهلاكاً 🔥' : 'Top Spend 🔥'}</Text>
+              <View style={[styles.tagBadge, isDarkMode && { backgroundColor: '#1F1F1F', borderColor: themeColors.border, borderWidth: 1 }, isArabic && { alignSelf: 'flex-end' }]}>
+                <Text style={[styles.tagText, isDarkMode && { color: themeColors.primary }]}>{isArabic ? 'الأعلى استهلاكاً 🔥' : 'Top Spend 🔥'}</Text>
               </View>
               <Text
-                style={[styles.spotlightName, isArabic && { textAlign: 'right' }]}
+                style={[styles.spotlightName, isDarkMode && { color: themeColors.textPrimary }, isArabic && { textAlign: 'right' }]}
                 numberOfLines={1}
                 adjustsFontSizeToFit={true}
                 minimumFontScale={0.8}
@@ -66,14 +68,14 @@ export const TopSpendingChart = ({ onSeeAll }) => {
 
           <View style={[styles.spotlightLeft, isArabic && { alignItems: 'flex-start' }]}>
             <Text
-              style={[styles.spotlightAmount, { color: topCategory.category.color }]}
+              style={[styles.spotlightAmount, { color: isDarkMode ? themeColors.expense : topCategory.category.color }]}
               numberOfLines={1}
               adjustsFontSizeToFit={true}
               minimumFontScale={0.8}
             >
               {formatAmount(topCategory.total)} {currency.symbol}
             </Text>
-            <Text style={styles.spotlightPercent}>
+            <Text style={[styles.spotlightPercent, isDarkMode && { color: themeColors.textSecondary }]}>
               {Math.round(topCategory.percentage)}% {isArabic ? 'من الصرف' : 'of spending'}
             </Text>
           </View>
@@ -82,34 +84,35 @@ export const TopSpendingChart = ({ onSeeAll }) => {
 
       {/* Visual Bar Charts */}
       <View style={styles.barsContainer}>
-        {topCategories.map((item) => {
+        {topCategories.map((item, idx) => {
+          const darkBarColor = idx % 2 === 0 ? themeColors.primary : themeColors.info;
           return (
             <View key={item.category.id} style={styles.barItem}>
               <View style={[styles.barHeader, isArabic && { flexDirection: 'row-reverse' }]}>
                 <View style={[styles.barRightInfo, isArabic && { flexDirection: 'row-reverse' }]}>
-                  <View style={[styles.miniDot, { backgroundColor: item.category.color }]} />
-                  <Text style={styles.barName} numberOfLines={1}>
+                  <View style={[styles.miniDot, { backgroundColor: isDarkMode ? darkBarColor : item.category.color }]} />
+                  <Text style={[styles.barName, isDarkMode && { color: themeColors.textPrimary }]} numberOfLines={1}>
                     {item.category.name}
                   </Text>
                 </View>
 
                 <View style={[styles.barLeftInfo, isArabic && { flexDirection: 'row-reverse' }]}>
-                  <Text style={styles.barAmount}>
+                  <Text style={[styles.barAmount, isDarkMode && { color: themeColors.textPrimary }]}>
                     {formatAmount(item.total)} {currency.symbol}
                   </Text>
-                  <Text style={styles.barPercent}>
+                  <Text style={[styles.barPercent, isDarkMode && { color: themeColors.textSecondary }]}>
                     ({Math.round(item.percentage)}%)
                   </Text>
                 </View>
               </View>
 
-              <View style={[styles.track, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View style={[styles.track, isDarkMode && { backgroundColor: '#1B2A27' }, isArabic && { flexDirection: 'row-reverse' }]}>
                 <View
                   style={[
                     styles.fill,
                     {
                       width: `${Math.max(item.percentage, 4)}%`,
-                      backgroundColor: item.category.color,
+                      backgroundColor: isDarkMode ? darkBarColor : item.category.color,
                     },
                   ]}
                 />

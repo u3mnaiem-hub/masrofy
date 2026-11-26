@@ -1164,14 +1164,116 @@ export const ExpenseProvider = ({ children }) => {
     }
   };
 
-  const deleteArchivedMonth = async (archiveId) => {
-    const updated = archivedMonths.filter((m) => m.id !== archiveId);
+  const recomputeArchiveSummary = (arch, nextTransactions) => {
+    const list = sortTransactionsNewestFirst(Array.isArray(nextTransactions) ? nextTransactions : []);
+    let realTotalSpent = 0;
+    let totalIncome = 0;
+    let totalCcPaid = 0;
+    list.forEach((tx) => {
+      const amt = parseFloat(tx?.amount) || 0;
+      if (tx?.type === 'switch' || tx?.categoryId === 'switch') return;
+      if (tx?.type === 'income' || tx?.categoryId === 'incomings') {
+        totalIncome += amt;
+        return;
+      }
+      if (tx?.type === 'cc_pyd' || tx?.categoryId === 'cc_pyd') {
+        totalCcPaid += amt;
+        return;
+      }
+      realTotalSpent += amt;
+    });
+
+    const totalStarted = parseFloat(arch?.totalStartedWith ?? arch?.balancesSummary?.totalStartedWith ?? 0) || 0;
+    const totalOutflow = Math.max(0, realTotalSpent - totalIncome);
+    const finalRemainingBalance = totalStarted > 0 ? totalStarted - totalOutflow : (arch?.netAvailableAfterCards ?? 0);
+
+    return {
+      ...arch,
+      transactions: list,
+      transactionsCount: list.length,
+      realTotalSpent,
+      totalOutflow,
+      totalCcPaid,
+      netAvailableAfterCards: finalRemainingBalance,
+      balancesSummary: {
+        ...(arch?.balancesSummary || {}),
+        totalStartedWith: totalStarted,
+        totalExpense: realTotalSpent,
+        totalOutflow,
+        finalRemainingBalance,
+      },
+    };
+  };
+
+  const persistArchivedMonths = async (updated) => {
     setArchivedMonths(updated);
     try {
       await AsyncStorage.setItem(STORAGE_KEYS.ARCHIVED_MONTHS, JSON.stringify(updated));
     } catch (e) {
-      console.error('Error deleting archived month:', e);
+      console.error('Error saving archived months:', e);
     }
+  };
+
+  const deleteArchivedMonth = async (archiveId) => {
+    const updated = archivedMonths.filter((m) => m.id !== archiveId);
+    await persistArchivedMonths(updated);
+  };
+
+  const updateArchivedMonthDates = async (archiveId, { cycleStartDate: nextStart, cycleEndDate: nextEnd }) => {
+    const updated = archivedMonths.map((m) => {
+      if (m.id !== archiveId) return m;
+      return {
+        ...m,
+        cycleStartDate: (nextStart || m.cycleStartDate || '').trim(),
+        cycleEndDate: (nextEnd || m.cycleEndDate || '').trim(),
+      };
+    });
+    await persistArchivedMonths(updated);
+    return true;
+  };
+
+  const addArchivedTransaction = async (archiveId, txPayload) => {
+    const newTx = {
+      ...txPayload,
+      id: 'arch_tx_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+      amount: parseFloat(txPayload?.amount) || 0,
+      date: txPayload?.date || new Date().toISOString().split('T')[0],
+      createdAt: Date.now(),
+    };
+    const updated = archivedMonths.map((m) => {
+      if (m.id !== archiveId) return m;
+      return recomputeArchiveSummary(m, [newTx, ...(m.transactions || [])]);
+    });
+    await persistArchivedMonths(updated);
+    return newTx;
+  };
+
+  const updateArchivedTransaction = async (archiveId, txId, txPayload) => {
+    const updated = archivedMonths.map((m) => {
+      if (m.id !== archiveId) return m;
+      const nextTxs = (m.transactions || []).map((t) =>
+        t.id === txId
+          ? {
+              ...t,
+              ...txPayload,
+              amount: parseFloat(txPayload?.amount) || 0,
+            }
+          : t
+      );
+      return recomputeArchiveSummary(m, nextTxs);
+    });
+    await persistArchivedMonths(updated);
+    return true;
+  };
+
+  const deleteArchivedTransaction = async (archiveId, txId) => {
+    const updated = archivedMonths.map((m) => {
+      if (m.id !== archiveId) return m;
+      const nextTxs = (m.transactions || []).filter((t) => t.id !== txId);
+      return recomputeArchiveSummary(m, nextTxs);
+    });
+    await persistArchivedMonths(updated);
+    return true;
   };
 
   const setCurrency = async (newCurr) => {
@@ -2218,6 +2320,10 @@ export const ExpenseProvider = ({ children }) => {
         updateAlertPrefs,
         archivedMonths,
         deleteArchivedMonth,
+        updateArchivedMonthDates,
+        addArchivedTransaction,
+        updateArchivedTransaction,
+        deleteArchivedTransaction,
         categoryBudgets,
         setCategoryBudget,
         budgetStatus,
