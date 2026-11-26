@@ -13,7 +13,7 @@ export const isBiometricHardwareAvailable = async () => {
   }
 };
 
-export const authenticateWithBiometrics = async (isArabic = true) => {
+export const authenticateWithBiometrics = async (isArabic = true, hasCustomAppSecret = false) => {
   if (Platform.OS !== 'android' || !VoiceInputNative || typeof VoiceInputNative.authenticateBiometric !== 'function') {
     return false;
   }
@@ -22,7 +22,16 @@ export const authenticateWithBiometrics = async (isArabic = true) => {
     const subtitle = isArabic
       ? 'ضع بصمة إصبعك لفتح قفل تطبيق مصروفي'
       : 'Touch the fingerprint sensor to unlock Masrofy';
-    const cancelText = isArabic ? 'استخدام الرقم السري / إلغاء' : 'Use PIN / Cancel';
+    const cancelText = hasCustomAppSecret
+      ? (isArabic ? 'استخدام كلمة سر مصروفي' : 'Use Masrofy Password')
+      : (isArabic ? 'استخدام الرقم السري / إلغاء' : 'Use PIN / Cancel');
+
+    // When a custom Masrofy PIN/Password is set, do NOT allow device PIN fallback inside BiometricPrompt
+    if (hasCustomAppSecret && typeof VoiceInputNative.authenticateBiometricOnly === 'function') {
+      const res = await VoiceInputNative.authenticateBiometricOnly(title, subtitle, cancelText);
+      return Boolean(res);
+    }
+
     const res = await VoiceInputNative.authenticateBiometric(title, subtitle, cancelText);
     return Boolean(res);
   } catch {

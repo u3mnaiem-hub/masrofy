@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, LogBox, Image, Animated } from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, LogBox, Image, Animated } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
 const SPLASH_SCREEN_IMAGE = require('./assets/splash-screen.jpg');
@@ -23,6 +23,7 @@ import { COLORS, NEON_GLOW } from './src/constants/theme';
 function MainApp() {
   const [activeTab, setActiveTab] = useState('home');
   const [enteredPin, setEnteredPin] = useState('');
+  const [showLockPassword, setShowLockPassword] = useState(false);
   const [pinError, setPinError] = useState(false);
   const {
     isLoading,
@@ -51,6 +52,9 @@ function MainApp() {
   }, [isLoading, isLockRequired, isAppUnlocked, biometricEnabled, biometricHardwareAvailable]);
 
   if (!isLoading && isLockRequired && !isAppUnlocked) {
+    const isFourDigitNumericPin = Boolean(appPin && /^\d{4}$/.test(appPin));
+    const isNumericOnlySecret = Boolean(appPin && /^\d+$/.test(appPin));
+
     const onDigitPress = (d) => {
       const next = (enteredPin + d).slice(0, 4);
       setEnteredPin(next);
@@ -65,6 +69,18 @@ function MainApp() {
         }
       }
     };
+
+    const handleSubmitCustomSecret = () => {
+      const ok = unlockAppWithPin(enteredPin);
+      if (!ok) {
+        setPinError(true);
+        setEnteredPin('');
+      } else {
+        setEnteredPin('');
+        setPinError(false);
+      }
+    };
+
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#0F172A', padding: 24 }]}>
         <StatusBar style="light" backgroundColor="#0F172A" />
@@ -76,10 +92,10 @@ function MainApp() {
         </Text>
         <Text style={{ color: '#94A3B8', fontSize: 13, marginBottom: 18, textAlign: 'center' }}>
           {pinError
-            ? (isArabic ? '❌ الرقم السري غير صحيح، حاول مرة أخرى' : '❌ Incorrect PIN, try again')
+            ? (isArabic ? '❌ كلمة السر / الرمز غير صحيح، حاول مرة أخرى' : '❌ Incorrect PIN / Password, try again')
             : biometricEnabled && biometricHardwareAvailable
-            ? (isArabic ? 'استخدم بصمة الإصبع للدخول السريع أو الرقم السري' : 'Use Fingerprint or your 4-digit PIN to unlock')
-            : (isArabic ? 'أدخل الرقم السري المكون من 4 أرقام للمتابعة' : 'Enter your 4-digit PIN to unlock')}
+            ? (isArabic ? 'استخدم بصمة الإصبع للدخول السريع أو كلمة سر مصروفي' : 'Use Fingerprint or your Masrofy PIN / Password to unlock')
+            : (isArabic ? 'أدخل كلمة السر أو رمز الـ PIN الخاص بمصروفي للمتابعة' : 'Enter your custom Masrofy PIN / Password to continue')}
         </Text>
 
         {biometricEnabled && biometricHardwareAvailable && (
@@ -108,45 +124,103 @@ function MainApp() {
         )}
 
         {appPin ? (
-          <>
-            <View style={{ flexDirection: 'row', gap: 14, marginBottom: 22 }}>
-              {[0, 1, 2, 3].map((i) => (
-                <View
-                  key={i}
+          isFourDigitNumericPin ? (
+            <>
+              <View style={{ flexDirection: 'row', gap: 14, marginBottom: 22 }}>
+                {[0, 1, 2, 3].map((i) => (
+                  <View
+                    key={i}
+                    style={{
+                      width: 16,
+                      height: 16,
+                      borderRadius: 8,
+                      backgroundColor: enteredPin.length > i ? themeColors.primary : '#334155',
+                    }}
+                  />
+                ))}
+              </View>
+              <View style={{ width: 250, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12 }}>
+                {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'].map((k) => (
+                  <TouchableOpacity
+                    key={k}
+                    onPress={() => {
+                      if (k === 'C') setEnteredPin('');
+                      else if (k === '⌫') setEnteredPin((p) => p.slice(0, -1));
+                      else onDigitPress(k);
+                    }}
+                    style={{
+                      width: 68,
+                      height: 56,
+                      borderRadius: 16,
+                      backgroundColor: '#1E293B',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      borderWidth: 1,
+                      borderColor: '#334155',
+                    }}
+                  >
+                    <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '800' }}>{k}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          ) : (
+            <View style={{ width: '100%', maxWidth: 300 }}>
+              <View style={{ position: 'relative', marginBottom: 12 }}>
+                <TextInput
                   style={{
-                    width: 16,
-                    height: 16,
-                    borderRadius: 8,
-                    backgroundColor: enteredPin.length > i ? themeColors.primary : '#334155',
-                  }}
-                />
-              ))}
-            </View>
-            <View style={{ width: 250, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12 }}>
-              {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'].map((k) => (
-                <TouchableOpacity
-                  key={k}
-                  onPress={() => {
-                    if (k === 'C') setEnteredPin('');
-                    else if (k === '⌫') setEnteredPin((p) => p.slice(0, -1));
-                    else onDigitPress(k);
-                  }}
-                  style={{
-                    width: 68,
-                    height: 56,
-                    borderRadius: 16,
                     backgroundColor: '#1E293B',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    borderWidth: 1,
-                    borderColor: '#334155',
+                    color: '#FFFFFF',
+                    borderWidth: 1.5,
+                    borderColor: pinError ? '#EF4444' : '#334155',
+                    borderRadius: 14,
+                    paddingVertical: 12,
+                    paddingHorizontal: 14,
+                    paddingLeft: isArabic ? 42 : 14,
+                    paddingRight: isArabic ? 14 : 42,
+                    fontSize: 16,
+                    fontWeight: '700',
+                    textAlign: isArabic ? 'right' : 'left',
                   }}
+                  placeholder={
+                    isNumericOnlySecret
+                      ? (isArabic ? 'أدخل رمز PIN الخاص بمصروفي' : 'Enter Masrofy PIN')
+                      : (isArabic ? 'أدخل كلمة السر الخاصة بمصروفي' : 'Enter Masrofy Password')
+                  }
+                  placeholderTextColor="#64748B"
+                  keyboardType={isNumericOnlySecret ? 'numeric' : 'default'}
+                  secureTextEntry={!showLockPassword}
+                  autoCapitalize="none"
+                  value={enteredPin}
+                  onChangeText={(v) => {
+                    setEnteredPin(v);
+                    setPinError(false);
+                  }}
+                  onSubmitEditing={handleSubmitCustomSecret}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowLockPassword((v) => !v)}
+                  style={{ position: 'absolute', top: 12, [isArabic ? 'left' : 'right']: 12, padding: 2 }}
                 >
-                  <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '800' }}>{k}</Text>
+                  <MaterialCommunityIcons name={showLockPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#94A3B8" />
                 </TouchableOpacity>
-              ))}
+              </View>
+              <TouchableOpacity
+                onPress={handleSubmitCustomSecret}
+                activeOpacity={0.85}
+                style={{
+                  backgroundColor: '#10B981',
+                  paddingVertical: 13,
+                  borderRadius: 14,
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '900' }}>
+                  {isArabic ? 'فتح التطبيق 🔓' : 'Unlock App 🔓'}
+                </Text>
+              </TouchableOpacity>
             </View>
-          </>
+          )
         ) : (
           <TouchableOpacity
             onPress={() => unlockAppWithDeviceCredential && unlockAppWithDeviceCredential()}

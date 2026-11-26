@@ -2057,7 +2057,8 @@ export const ExpenseProvider = ({ children }) => {
   };
 
   const unlockAppWithPin = (enteredPin) => {
-    if (!appPin || enteredPin === appPin) {
+    const cleanEntered = (enteredPin || '').trim();
+    if (!appPin || cleanEntered === appPin) {
       setIsAppUnlocked(true);
       return true;
     }
@@ -2065,7 +2066,7 @@ export const ExpenseProvider = ({ children }) => {
   };
 
   const unlockAppWithBiometrics = async () => {
-    const ok = await authenticateWithBiometrics(language === 'ar');
+    const ok = await authenticateWithBiometrics(language === 'ar', Boolean(appPin));
     if (ok) {
       setIsAppUnlocked(true);
       return true;

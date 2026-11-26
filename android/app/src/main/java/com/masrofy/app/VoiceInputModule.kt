@@ -526,6 +526,69 @@ class VoiceInputModule(private val reactContext: ReactApplicationContext) :
     }
 
     @ReactMethod
+    fun authenticateBiometricOnly(title: String, subtitle: String, cancelText: String, promise: Promise) {
+        UiThreadUtil.runOnUiThread {
+            val settled = AtomicBoolean(false)
+            fun resolveOnce(result: Boolean) {
+                if (settled.compareAndSet(false, true)) {
+                    promise.resolve(result)
+                }
+            }
+
+            try {
+                val activity = reactContext.currentActivity
+                if (activity == null) {
+                    resolveOnce(false)
+                    return@runOnUiThread
+                }
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    val executor = androidx.core.content.ContextCompat.getMainExecutor(activity)
+                    val cancellationSignal = CancellationSignal()
+                    val promptTitle = if (title.isNotBlank()) title else "تأكيد الهوية بالبصمة"
+                    val promptSub = if (subtitle.isNotBlank()) subtitle else "ضع إصبعك على مستشعر البصمة لفتح تطبيق مصروفي"
+                    val negText = if (cancelText.isNotBlank()) cancelText else "استخدام كلمة سر مصروفي"
+
+                    val builder = BiometricPrompt.Builder(activity)
+                        .setTitle(promptTitle)
+                        .setSubtitle(promptSub)
+                        .setNegativeButton(negText, executor) { _, _ ->
+                            resolveOnce(false)
+                        }
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        builder.setAllowedAuthenticators(
+                            BiometricManager.Authenticators.BIOMETRIC_WEAK or
+                                BiometricManager.Authenticators.BIOMETRIC_STRONG
+                        )
+                    }
+
+                    val prompt = builder.build()
+                    prompt.authenticate(
+                        cancellationSignal,
+                        executor,
+                        object : BiometricPrompt.AuthenticationCallback() {
+                            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult?) {
+                                super.onAuthenticationSucceeded(result)
+                                resolveOnce(true)
+                            }
+
+                            override fun onAuthenticationError(errorCode: Int, errString: CharSequence?) {
+                                super.onAuthenticationError(errorCode, errString)
+                                resolveOnce(false)
+                            }
+                        }
+                    )
+                } else {
+                    resolveOnce(false)
+                }
+            } catch (e: Exception) {
+                resolveOnce(false)
+            }
+        }
+    }
+
+    @ReactMethod
     fun authenticateDeviceCredential(title: String, subtitle: String, promise: Promise) {
         UiThreadUtil.runOnUiThread {
             try {
