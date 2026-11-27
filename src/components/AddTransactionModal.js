@@ -8,6 +8,7 @@ import {
   ScrollView,
   StyleSheet,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   Alert,
   Image,
@@ -66,6 +67,22 @@ export const AddTransactionModal = ({
   } = useExpense();
 
   const insets = useSafeAreaInsets();
+  const formScrollRef = useRef(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardHeight(e?.endCoordinates?.height || 260);
+    });
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
   // Mode: 'expense' | 'cc_pyd' | 'income' | 'switch'
   const [mode, setMode] = useState(initialType || 'expense');
   const [amount, setAmount] = useState('');
@@ -890,10 +907,10 @@ export const AddTransactionModal = ({
       onRequestClose={onClose}
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.overlay}
       >
-        <View style={[styles.modalContent, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
+        <View style={[styles.modalContent, { paddingBottom: keyboardHeight > 0 ? 10 : Math.max(insets.bottom, 16) + 12 }]}>
           {/* Header */}
           <View style={[styles.header, isArabic && { flexDirection: 'row-reverse' }]}>
             <View style={{ width: 36 }} />
@@ -912,8 +929,12 @@ export const AddTransactionModal = ({
           </View>
 
           <ScrollView
+            ref={formScrollRef}
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollBody}
+            contentContainerStyle={[
+              styles.scrollBody,
+              keyboardHeight > 0 && { paddingBottom: Math.min(keyboardHeight, 240) + 40 },
+            ]}
             keyboardShouldPersistTaps="handled"
           >
             {/* 4 Mode Tabs */}
@@ -1738,6 +1759,11 @@ export const AddTransactionModal = ({
               style={styles.noteInput}
               value={note}
               onChangeText={setNote}
+              onFocus={() => {
+                setTimeout(() => {
+                  formScrollRef.current?.scrollToEnd({ animated: true });
+                }, 180);
+              }}
               placeholder={
                 mode === 'cc_pyd'
                   ? isArabic ? 'مثال: سداد كارت البنك العربي' : 'e.g. Arab Bank CC Payment'

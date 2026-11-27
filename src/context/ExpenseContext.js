@@ -67,6 +67,9 @@ export const INITIAL_ALERT_PREFS = {
   voiceAutoSaveEnabled: true,
   toolbarScrollLocked: false,
   dailyExpenseReminderEnabled: true,
+  toolbarColor: 'navy', // 'navy' | 'crimson' | 'teal' | 'charcoal' | 'brown' | 'purple'
+  darkModeStyle: 'soft', // 'soft' | 'olive80s'
+  creditLimits: { cc_ar: 3300, cc_ca: 15000 },
 };
 
 // Rule: Any Credit Card purchase (CC AR, CC CA, or any custom credit card) is due on the 25th of the FOLLOWING calendar month.
@@ -623,6 +626,7 @@ export const ExpenseProvider = ({ children }) => {
     linkedAccountType,
     startingBalance = 0,
     carryOverDueThisMonth = 0,
+    creditLimit = 0,
   }) => {
     const cleanName = (bankName || '').trim();
     if (!cleanName) return null;
@@ -637,6 +641,7 @@ export const ExpenseProvider = ({ children }) => {
       startingBalance: parseFloat(startingBalance) || 0,
       carryOverDueThisMonth: parseFloat(carryOverDueThisMonth) || 0,
       carryOverDueNextMonth: 0,
+      creditLimit: normType === 'credit' ? (parseFloat(creditLimit) || 0) : 0,
       createdAt: Date.now(),
     };
     const updated = [...customAccounts, newAcc];
@@ -1659,6 +1664,7 @@ export const ExpenseProvider = ({ children }) => {
       customDebitCardsSummary,
       customCreditCardsSummary,
       customDebitTotalAvail,
+      customDebitTotalStart,
       ccCaCarryOverLeft,
       ccCaPurchases,
       ccCaPaid,
@@ -2359,7 +2365,8 @@ export const ExpenseProvider = ({ children }) => {
         unlockAppWithBiometrics,
         unlockAppWithDeviceCredential,
         lockAppNow,
-        themeColors: getThemeColors(isDarkMode, colorPalette),
+        isOliveDark: isDarkMode && alertPrefs?.darkModeStyle === 'olive80s',
+        themeColors: getThemeColors(isDarkMode, colorPalette, alertPrefs?.darkModeStyle || 'soft'),
         transactions: sortedTransactions,
         monthTransactions: sortedTransactions,
         selectedMonth: '2026-11',

@@ -52,7 +52,7 @@ export const TopSpendingChart = ({ onSeeAll }) => {
               <MaterialCommunityIcons name={topCategory.category.icon} size={22} color={isDarkMode ? themeColors.primary : '#FFFFFF'} />
             </View>
             <View style={[{ flex: 1 }, isArabic && { alignItems: 'flex-end' }]}>
-              <View style={[styles.tagBadge, isDarkMode && { backgroundColor: '#1F1F1F', borderColor: themeColors.border, borderWidth: 1 }, isArabic && { alignSelf: 'flex-end' }]}>
+              <View style={[styles.tagBadge, isDarkMode && { backgroundColor: themeColors.primaryLight, borderColor: themeColors.border, borderWidth: 1 }, isArabic && { alignSelf: 'flex-end' }]}>
                 <Text style={[styles.tagText, isDarkMode && { color: themeColors.primary }]}>{isArabic ? 'الأعلى استهلاكاً 🔥' : 'Top Spend 🔥'}</Text>
               </View>
               <Text
@@ -106,7 +106,7 @@ export const TopSpendingChart = ({ onSeeAll }) => {
                 </View>
               </View>
 
-              <View style={[styles.track, isDarkMode && { backgroundColor: '#1B2A27' }, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View style={[styles.track, isDarkMode && { backgroundColor: themeColors.primaryUltraLight }, isArabic && { flexDirection: 'row-reverse' }]}>
                 <View
                   style={[
                     styles.fill,

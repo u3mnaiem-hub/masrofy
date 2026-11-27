@@ -17,8 +17,8 @@ import { useExpense } from '../context/ExpenseContext';
 const LINKED_ACCOUNT_TYPES = [
   { id: 'current', labelAr: 'جاري', labelEn: 'Current', icon: 'bank-outline' },
   { id: 'savings', labelAr: 'توفير', labelEn: 'Savings', icon: 'piggy-bank-outline' },
-  { id: 'meeza', labelAr: 'ميزة', labelEn: 'Meeza', icon: 'card-account-details-outline' },
-  { id: 'credit', labelAr: 'ائتمان', labelEn: 'Credit', icon: 'credit-card-clock-outline' },
+  { id: 'meeza', labelAr: 'ميزة / دفع مسبق', labelEn: 'Meeza / Prepaid', icon: 'card-account-details-outline' },
+  { id: 'credit', labelAr: 'ائتمان / مشتريات', labelEn: 'Credit Card', icon: 'credit-card-clock-outline' },
 ];
 
 export const ManageBanksModal = ({ visible, onClose }) => {
@@ -41,6 +41,7 @@ export const ManageBanksModal = ({ visible, onClose }) => {
   const [bankName, setBankName] = useState('');
   const [startingBalance, setStartingBalance] = useState('');
   const [carryOver, setCarryOver] = useState('');
+  const [creditLimitInput, setCreditLimitInput] = useState('');
 
   const handleSelectCardType = (type) => {
     setAccountType(type);
@@ -69,11 +70,13 @@ export const ManageBanksModal = ({ visible, onClose }) => {
       linkedAccountType,
       startingBalance: accountType === 'debit' ? parseFloat(startingBalance) || 0 : 0,
       carryOverDueThisMonth: accountType === 'credit' ? parseFloat(carryOver) || 0 : 0,
+      creditLimit: accountType === 'credit' ? parseFloat(creditLimitInput) || 0 : 0,
     });
 
     setBankName('');
     setStartingBalance('');
     setCarryOver('');
+    setCreditLimitInput('');
   };
 
   const handleDeleteCustom = (acc) => {
@@ -192,8 +195,10 @@ export const ManageBanksModal = ({ visible, onClose }) => {
                     styles.typeBtnText,
                     accountType === 'debit' && styles.typeBtnTextActive,
                   ]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
                 >
-                  {isArabic ? 'ديبيت (Debit)' : 'Debit Card'}
+                  {isArabic ? 'ديبيت / دفع مسبق' : 'Debit / Prepaid'}
                 </Text>
               </TouchableOpacity>
 
@@ -215,8 +220,10 @@ export const ManageBanksModal = ({ visible, onClose }) => {
                     styles.typeBtnText,
                     accountType === 'credit' && styles.typeBtnTextActive,
                   ]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
                 >
-                  {isArabic ? 'كريديت (Credit)' : 'Credit Card'}
+                  {isArabic ? 'كريديت / مشتريات' : 'Credit Card'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -268,7 +275,7 @@ export const ManageBanksModal = ({ visible, onClose }) => {
               placeholderTextColor={COLORS.textMuted}
             />
 
-            {/* 4. Starting Balance or Carry-over */}
+            {/* 4. Starting Balance or Carry-over + Credit Limit */}
             {accountType === 'debit' ? (
               <>
                 <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>
@@ -284,13 +291,32 @@ export const ManageBanksModal = ({ visible, onClose }) => {
                   placeholder="0"
                   placeholderTextColor={COLORS.textMuted}
                 />
+                <Text style={[styles.hintText, isArabic && { textAlign: 'right' }]}>
+                  {isArabic
+                    ? '💡 بطاقات الديبيت والدفع المسبق والمرتبات (مثل الحساب الجاري أو ميزة) تُضاف تلقائياً ضمن إجمالي «الحساب البنكي (DC)» في الشاشة الرئيسية.'
+                    : '💡 Debit, Salary & Prepaid cards (e.g. Current, Savings, Meeza) are automatically included in your "Bank Account (DC)" total on the Home screen.'}
+                </Text>
               </>
             ) : (
               <>
                 <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>
                   {isArabic
-                    ? `4. مديونية حالية مستحقة (اختياري - ${currency.symbol})`
-                    : `4. Current Unpaid Balance Due (Optional - ${currency.symbol})`}
+                    ? `4. الحد الائتماني للبطاقة (اختياري - ${currency.symbol})`
+                    : `4. Card Credit Limit (Optional - ${currency.symbol})`}
+                </Text>
+                <TextInput
+                  style={[styles.textInput, isArabic && { textAlign: 'right' }]}
+                  value={creditLimitInput}
+                  onChangeText={setCreditLimitInput}
+                  keyboardType="numeric"
+                  placeholder={isArabic ? 'مثال: 15000 أو 3300' : 'e.g. 15000 or 3300'}
+                  placeholderTextColor={COLORS.textMuted}
+                />
+
+                <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>
+                  {isArabic
+                    ? `5. مديونية حالية مستحقة (اختياري - ${currency.symbol})`
+                    : `5. Current Unpaid Balance Due (Optional - ${currency.symbol})`}
                 </Text>
                 <TextInput
                   style={[styles.textInput, isArabic && { textAlign: 'right' }]}
@@ -302,8 +328,8 @@ export const ManageBanksModal = ({ visible, onClose }) => {
                 />
                 <Text style={[styles.hintText, isArabic && { textAlign: 'right' }]}>
                   {isArabic
-                    ? '💡 سيظهر هذا الكارت كبطاقة أساسية في الشاشة الرئيسية وطرق الدفع، ومشترياته تستحق يوم 25 من الشهر الميلادي التالي.'
-                    : '💡 This card will appear as a primary bank card on the Home screen and payment methods, due on the 25th of the following calendar month.'}
+                    ? '💡 بطاقة المشتريات/الائتمان منفصلة عن الحساب البنكي (DC)، ومشترياتها تستحق يوم 25 من الشهر الميلادي التالي.'
+                    : '💡 Credit cards are tracked separately from Bank (DC) funds with their own credit limit, and purchases are due on the 25th of the following calendar month.'}
                 </Text>
               </>
             )}

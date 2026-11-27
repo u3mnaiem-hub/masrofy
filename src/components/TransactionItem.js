@@ -154,8 +154,14 @@ export const TransactionItem = ({ item, onEdit, onDelete }) => {
   return (
     <View style={[styles.card, SHADOWS.small, isArabic && { flexDirection: 'row-reverse' }, isDarkMode && { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
       {/* Category Icon */}
-      <View style={[styles.iconContainer, { backgroundColor: category.bgColor }]}>
-        <MaterialCommunityIcons name={category.icon} size={18} color={category.color} />
+      <View
+        style={[
+          styles.iconContainer,
+          { backgroundColor: isDarkMode ? themeColors.primaryLight : category.bgColor },
+          isDarkMode && { borderWidth: 1, borderColor: themeColors.border },
+        ]}
+      >
+        <MaterialCommunityIcons name={category.icon} size={18} color={isDarkMode ? themeColors.primary : category.color} />
       </View>
 
       {/* Main Details (Flexible middle column, never overlaps) */}
@@ -242,12 +248,16 @@ export const TransactionItem = ({ item, onEdit, onDelete }) => {
           <Text
             style={[
               styles.amountText,
-              { color: isIncome ? COLORS.incomeDark : COLORS.expense },
+              {
+                color: isDarkMode
+                  ? (isIncome ? themeColors.income : themeColors.expense)
+                  : (isIncome ? COLORS.incomeDark : COLORS.expense),
+              },
             ]}
           >
             {isIncome ? '+' : '-'} {formatAmount(item.amount)}
           </Text>
-          <Text style={styles.currencySymbol}>{currency.symbol}</Text>
+          <Text style={[styles.currencySymbol, isDarkMode && { color: themeColors.textMuted }]}>{currency.symbol}</Text>
         </View>
 
         {/* Action buttons: Edit + Delete */}

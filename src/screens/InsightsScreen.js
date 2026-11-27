@@ -23,6 +23,7 @@ export const InsightsScreen = () => {
     getAccountById,
     archivedMonths,
     isDarkMode,
+    isOliveDark,
     themeColors,
   } = useExpense();
 
@@ -80,17 +81,123 @@ export const InsightsScreen = () => {
 
   const topCategory = categoryBreakdown.length > 0 ? categoryBreakdown[0] : null;
 
+  // Daily total expenses breakdown for every active day in the current fiscal month
+  const dailySpendingList = useMemo(() => {
+    const dayNamesAr = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+    const dayNamesEn = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const map = {};
+
+    monthTransactions.forEach((tx) => {
+      if (
+        tx.type === 'switch' ||
+        tx.categoryId === 'switch' ||
+        tx.type === 'cc_pyd' ||
+        tx.categoryId === 'cc_pyd' ||
+        tx.type === 'income'
+      ) {
+        return;
+      }
+      const dateKey = tx.date || new Date().toISOString().split('T')[0];
+      const amt = parseFloat(tx.amount) || 0;
+      if (!map[dateKey]) {
+        let dayName = '';
+        try {
+          const parts = dateKey.split('-').map(Number);
+          if (parts.length === 3 && !parts.some(isNaN)) {
+            const dObj = new Date(parts[0], parts[1] - 1, parts[2]);
+            const idx = dObj.getDay();
+            dayName = isArabic ? dayNamesAr[idx] : dayNamesEn[idx];
+          }
+        } catch {}
+        map[dateKey] = { date: dateKey, dayName, total: 0, count: 0 };
+      }
+      map[dateKey].total += amt;
+      map[dateKey].count += 1;
+    });
+
+    const list = Object.values(map).sort((a, b) => b.date.localeCompare(a.date));
+    const maxDaily = list.reduce((m, item) => Math.max(m, item.total), 0) || 1;
+    return { list, maxDaily };
+  }, [monthTransactions, isArabic]);
+
   const monthComparison = useMemo(() => {
     const prevArch = (archivedMonths || [])[0];
-    const prevTotal = prevArch?.summary?.realTotalSpent || prevArch?.summary?.totalOutflow || 3250;
-    const prevLabel = prevArch
-      ? `${prevArch.cycleStartDate} ⬅️ ${prevArch.cycleEndDate}`
-      : (isArabic ? 'متوسط الشهر السابق' : 'Previous Month Baseline');
     const curTotal = balances.realTotalSpent || 0;
-    const diff = curTotal - prevTotal;
-    const diffPct = prevTotal > 0 ? Math.round((Math.abs(diff) / prevTotal) * 100) : 0;
-    return { prevTotal, prevLabel, curTotal, diff, diffPct, isSaving: diff <= 0 };
-  }, [archivedMonths, balances.realTotalSpent, isArabic]);
+    const elapsedDays = Math.max(0, balances.daysElapsed || 0);
+    const displayDays = Math.max(1, elapsedDays);
+
+    if (!prevArch) {
+      return {
+        hasPrevious: false,
+        prevLabel: isArabic
+          ? 'سيتم تفعيل المقارنة تلقائياً بعد إغلاق أول شهر مالي'
+          : 'Comparison activates automatically after closing your first fiscal month',
+        curTotal,
+        prevSamePeriodTotal: 0,
+        displayDays,
+        diffPct: 0,
+        isSaving: true,
+      };
+    }
+
+    const parseLocal = (str) => {
+      if (!str || typeof str !== 'string') return null;
+      const p = str.split('-').map(Number);
+      if (p.length !== 3 || p.some(isNaN)) return null;
+      return new Date(p[0], p[1] - 1, p[2]);
+    };
+
+    const pStart = parseLocal(prevArch.cycleStartDate);
+    const prevTxs = Array.isArray(prevArch.transactions) ? prevArch.transactions : [];
+
+    // Sum actual expenses in the previous archived month during the EXACT same number of elapsed days from its start
+    let prevSamePeriodTotal = 0;
+    if (pStart && prevTxs.length > 0) {
+      const cutoff = new Date(pStart.getFullYear(), pStart.getMonth(), pStart.getDate() + elapsedDays);
+      prevTxs.forEach((tx) => {
+        if (
+          tx.type === 'switch' ||
+          tx.categoryId === 'switch' ||
+          tx.type === 'cc_pyd' ||
+          tx.categoryId === 'cc_pyd' ||
+          tx.type === 'income'
+        ) {
+          return;
+        }
+        const txD = parseLocal(tx.date);
+        if (!txD || txD <= cutoff) {
+          prevSamePeriodTotal += parseFloat(tx.amount) || 0;
+        }
+      });
+    } else {
+      prevSamePeriodTotal =
+        prevArch?.balancesSummary?.totalExpense ??
+        prevArch?.realTotalSpent ??
+        prevArch?.totalOutflow ??
+        0;
+    }
+
+    const diff = curTotal - prevSamePeriodTotal;
+    const diffPct =
+      prevSamePeriodTotal > 0
+        ? Math.round((Math.abs(diff) / prevSamePeriodTotal) * 100)
+        : (curTotal > 0 ? 100 : 0);
+
+    const prevLabel = isArabic
+      ? `مقارنة أول ${displayDays} يوم من الشهر الحالي مع نفس الفترة من الشهر السابق (${prevArch.cycleStartDate})`
+      : `First ${displayDays}d of this month vs same period of previous month (${prevArch.cycleStartDate})`;
+
+    return {
+      hasPrevious: true,
+      curTotal,
+      prevSamePeriodTotal,
+      displayDays,
+      prevLabel,
+      diff,
+      diffPct,
+      isSaving: diff <= 0,
+    };
+  }, [archivedMonths, balances.realTotalSpent, balances.daysElapsed, isArabic]);
 
   return (
     <SafeAreaView style={[styles.safeArea, isDarkMode && { backgroundColor: themeColors.background }]}>
@@ -183,36 +290,69 @@ export const InsightsScreen = () => {
               {monthComparison.prevLabel}
             </Text>
           </View>
-          <View
-            style={{
-              flexDirection: isArabic ? 'row-reverse' : 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              backgroundColor: isDarkMode ? themeColors.surfaceSecondary : (monthComparison.isSaving ? '#ECFDF5' : '#FEF2F2'),
-              padding: 12,
-              borderRadius: 12,
-              borderWidth: 1,
-              borderColor: isDarkMode ? themeColors.border : (monthComparison.isSaving ? '#6EE7B7' : '#FECACA'),
-            }}
-          >
-            <View style={{ flex: 1, alignItems: isArabic ? 'flex-end' : 'flex-start' }}>
-              <Text style={{ fontSize: 13, fontWeight: '900', color: isDarkMode ? (monthComparison.isSaving ? themeColors.primary : themeColors.expense) : (monthComparison.isSaving ? '#047857' : '#B91C1C') }}>
-                {monthComparison.isSaving
-                  ? (isArabic ? `🎉 وفرت ${monthComparison.diffPct}% مقارنة بالشهر السابق!` : `🎉 Saved ${monthComparison.diffPct}% vs Previous Month!`)
-                  : (isArabic ? `⚠️ زيادة ${monthComparison.diffPct}% عن الشهر السابق` : `⚠️ Up ${monthComparison.diffPct}% vs Previous Month`)}
-              </Text>
-              <Text style={{ fontSize: 11.5, color: isDarkMode ? themeColors.textSecondary : '#475569', marginTop: 3 }}>
-                {isArabic
-                  ? `الشهر الحالي: ${formatAmount(monthComparison.curTotal)} ${currency.symbol} • السابق: ${formatAmount(monthComparison.prevTotal)} ${currency.symbol}`
-                  : `Current: ${formatAmount(monthComparison.curTotal)} ${currency.symbol} • Previous: ${formatAmount(monthComparison.prevTotal)} ${currency.symbol}`}
-              </Text>
+          {!monthComparison.hasPrevious ? (
+            <View
+              style={{
+                flexDirection: isArabic ? 'row-reverse' : 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                backgroundColor: isDarkMode ? themeColors.surfaceSecondary : '#F8FAFC',
+                padding: 12,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: isDarkMode ? themeColors.border : '#E2E8F0',
+                gap: 10,
+              }}
+            >
+              <View style={{ flex: 1, alignItems: isArabic ? 'flex-end' : 'flex-start' }}>
+                <Text style={{ fontSize: 12.5, fontWeight: '800', color: isDarkMode ? themeColors.textPrimary : '#334155', textAlign: isArabic ? 'right' : 'left' }}>
+                  {isArabic ? 'لا يوجد شهر مالي سابق في الأرشيف بعد' : 'No Archived Fiscal Month Yet'}
+                </Text>
+                <Text style={{ fontSize: 11.5, color: isDarkMode ? themeColors.textSecondary : '#64748B', marginTop: 3, textAlign: isArabic ? 'right' : 'left' }}>
+                  {isArabic
+                    ? `إجمالي المصروف هذا الشهر حتى الآن: ${formatAmount(monthComparison.curTotal)} ${currency.symbol}`
+                    : `Total spent this month so far: ${formatAmount(monthComparison.curTotal)} ${currency.symbol}`}
+                </Text>
+              </View>
+              <MaterialCommunityIcons
+                name="calendar-clock"
+                size={26}
+                color={isDarkMode ? themeColors.primary : '#64748B'}
+              />
             </View>
-            <MaterialCommunityIcons
-              name={monthComparison.isSaving ? 'trending-down' : 'trending-up'}
-              size={28}
-              color={isDarkMode ? (monthComparison.isSaving ? themeColors.primary : themeColors.expense) : (monthComparison.isSaving ? '#059669' : '#DC2626')}
-            />
-          </View>
+          ) : (
+            <View
+              style={{
+                flexDirection: isArabic ? 'row-reverse' : 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                backgroundColor: isDarkMode ? themeColors.surfaceSecondary : (monthComparison.isSaving ? '#ECFDF5' : '#FEF2F2'),
+                padding: 12,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: isDarkMode ? themeColors.border : (monthComparison.isSaving ? '#6EE7B7' : '#FECACA'),
+                gap: 8,
+              }}
+            >
+              <View style={{ flex: 1, alignItems: isArabic ? 'flex-end' : 'flex-start' }}>
+                <Text style={{ fontSize: 12.5, fontWeight: '900', color: isDarkMode ? (monthComparison.isSaving ? themeColors.primary : themeColors.expense) : (monthComparison.isSaving ? '#047857' : '#B91C1C'), textAlign: isArabic ? 'right' : 'left' }}>
+                  {monthComparison.isSaving
+                    ? (isArabic ? `🎉 وفرت ${monthComparison.diffPct}% مقارنة بنفس الفترة من الشهر السابق!` : `🎉 Saved ${monthComparison.diffPct}% vs same period last month!`)
+                    : (isArabic ? `⚠️ زيادة ${monthComparison.diffPct}% عن نفس الفترة من الشهر السابق` : `⚠️ Up ${monthComparison.diffPct}% vs same period last month`)}
+                </Text>
+                <Text style={{ fontSize: 11.5, fontWeight: '700', color: isDarkMode ? themeColors.textPrimary : '#334155', marginTop: 4, textAlign: isArabic ? 'right' : 'left' }}>
+                  {isArabic
+                    ? `هذا الشهر: ${formatAmount(monthComparison.curTotal)} ${currency.symbol} • نفس الفترة الشهر السابق: ${formatAmount(monthComparison.prevSamePeriodTotal)} ${currency.symbol}`
+                    : `This Month: ${formatAmount(monthComparison.curTotal)} ${currency.symbol} • Same Period Prev: ${formatAmount(monthComparison.prevSamePeriodTotal)} ${currency.symbol}`}
+                </Text>
+              </View>
+              <MaterialCommunityIcons
+                name={monthComparison.isSaving ? 'trending-down' : 'trending-up'}
+                size={26}
+                color={isDarkMode ? (monthComparison.isSaving ? themeColors.primary : themeColors.expense) : (monthComparison.isSaving ? '#059669' : '#DC2626')}
+              />
+            </View>
+          )}
         </View>
 
         {/* 2. WHERE THE MONEY GOES */}
@@ -226,26 +366,43 @@ export const InsightsScreen = () => {
             </Text>
           </View>
 
-          {/* Top Category Callout */}
+          {/* Top Category Callout — Compact crisp typography so 100% of Arabic & English text fits cleanly */}
           {topCategory && (
-            <View style={[styles.topCallout, isDarkMode && { backgroundColor: themeColors.surfaceSecondary, borderColor: themeColors.border }, isArabic && { flexDirection: 'row-reverse' }]}>
-              <View style={[styles.topCalloutLeft, isArabic && { flexDirection: 'row-reverse' }]}>
-                <View style={[styles.badgeIcon, { backgroundColor: isDarkMode ? themeColors.primaryLight : topCategory.category.color }]}>
-                  <MaterialCommunityIcons name={topCategory.category.icon} size={20} color={isDarkMode ? themeColors.primary : '#FFFFFF'} />
+            <View
+              style={[
+                styles.topCallout,
+                { gap: 8, paddingHorizontal: 10, paddingVertical: 10 },
+                isDarkMode && { backgroundColor: themeColors.surfaceSecondary, borderColor: themeColors.border },
+                isArabic && { flexDirection: 'row-reverse' },
+              ]}
+            >
+              <View style={[styles.topCalloutLeft, { flex: 1, minWidth: 0, gap: 8 }, isArabic && { flexDirection: 'row-reverse' }]}>
+                <View style={[styles.badgeIcon, { width: 34, height: 34, borderRadius: 10, flexShrink: 0, backgroundColor: isDarkMode ? themeColors.primaryLight : topCategory.category.color }, isDarkMode && { borderWidth: 1, borderColor: themeColors.border }]}>
+                  <MaterialCommunityIcons name={topCategory.category.icon} size={18} color={isDarkMode ? themeColors.primary : '#FFFFFF'} />
                 </View>
-                <View style={isArabic ? { alignItems: 'flex-end' } : undefined}>
-                  <Text style={[styles.topCalloutBadge, isDarkMode && { color: themeColors.primary }]}>
+                <View style={[{ flex: 1, minWidth: 0 }, isArabic ? { alignItems: 'flex-end' } : { alignItems: 'flex-start' }]}>
+                  <Text style={[styles.topCalloutBadge, { fontSize: 10 }, isDarkMode && { color: themeColors.primary }, isArabic && { textAlign: 'right' }]} numberOfLines={1}>
                     {isArabic ? 'أعلى بند استهلاك' : 'Highest Category'}
                   </Text>
-                  <Text style={[styles.topCalloutName, isDarkMode && { color: themeColors.textPrimary }]}>{topCategory.category.name}</Text>
+                  <Text
+                    style={[
+                      styles.topCalloutName,
+                      { fontSize: 12.5, lineHeight: 17 },
+                      isDarkMode && { color: themeColors.textPrimary },
+                      isArabic && { textAlign: 'right' },
+                    ]}
+                    numberOfLines={2}
+                  >
+                    {topCategory.category.name}
+                  </Text>
                 </View>
               </View>
-              <View style={[styles.topCalloutRight, isArabic && { alignItems: 'flex-start' }]}>
-                <Text style={[styles.topCalloutAmt, isDarkMode && { color: themeColors.expense }]}>
+              <View style={[styles.topCalloutRight, { flexShrink: 0 }, isArabic && { alignItems: 'flex-start' }]}>
+                <Text style={[styles.topCalloutAmt, { fontSize: 13.5 }, isDarkMode && { color: themeColors.expense }]}>
                   {formatAmount(topCategory.total)} {currency.symbol}
                 </Text>
-                <Text style={[styles.topCalloutPct, isDarkMode && { color: themeColors.textSecondary }]}>
-                  {Math.round(topCategory.percentage)}% {isArabic ? 'من إجمالي الصرف' : 'of total spend'}
+                <Text style={[styles.topCalloutPct, { fontSize: 10 }, isDarkMode && { color: themeColors.textSecondary }]}>
+                  {Math.round(topCategory.percentage)}% {isArabic ? 'من الصرف' : 'of spend'}
                 </Text>
               </View>
             </View>
@@ -253,43 +410,134 @@ export const InsightsScreen = () => {
 
           {/* All Categories Bars */}
           <View style={styles.categoriesList}>
-            {categoryBreakdown.map((item) => (
-              <View key={item.category.id} style={styles.catItemRow}>
-                <View style={[styles.catTopRow, isArabic && { flexDirection: 'row-reverse' }]}>
-                  <View style={[styles.catLeftInfo, isArabic && { flexDirection: 'row-reverse' }]}>
-                    <View style={[styles.colorDot, { backgroundColor: item.category.color }]} />
-                    <Text style={styles.catItemName}>{item.category.name}</Text>
+            {categoryBreakdown.map((item, idx) => {
+              const barColor = isOliveDark
+                ? (idx % 2 === 0 ? themeColors.primary : themeColors.info)
+                : isDarkMode
+                ? (idx % 2 === 0 ? themeColors.primary : themeColors.info)
+                : item.category.color;
+              return (
+                <View key={item.category.id} style={styles.catItemRow}>
+                  <View style={[styles.catTopRow, isArabic && { flexDirection: 'row-reverse' }]}>
+                    <View style={[styles.catLeftInfo, { flex: 1, minWidth: 0 }, isArabic && { flexDirection: 'row-reverse' }]}>
+                      <View style={[styles.colorDot, { backgroundColor: barColor }]} />
+                      <Text style={[styles.catItemName, isDarkMode && { color: themeColors.textPrimary }, { flexShrink: 1 }]} numberOfLines={1}>
+                        {item.category.name}
+                      </Text>
+                    </View>
+                    <View style={[styles.catRightInfo, isArabic && { flexDirection: 'row-reverse' }]}>
+                      <Text style={[styles.catAmtText, isDarkMode && { color: themeColors.textPrimary }]}>{formatAmount(item.total)} {currency.symbol}</Text>
+                      <Text style={[styles.catPctText, isDarkMode && { color: themeColors.textSecondary }]}>({Math.round(item.percentage)}%)</Text>
+                    </View>
                   </View>
-                  <View style={[styles.catRightInfo, isArabic && { flexDirection: 'row-reverse' }]}>
-                    <Text style={styles.catAmtText}>{formatAmount(item.total)} {currency.symbol}</Text>
-                    <Text style={styles.catPctText}>({Math.round(item.percentage)}%)</Text>
-                  </View>
-                </View>
 
-                <View style={[styles.barTrack, isArabic && { flexDirection: 'row-reverse' }]}>
-                  <View
-                    style={[
-                      styles.barFill,
-                      {
-                        width: `${Math.max(item.percentage, 4)}%`,
-                        backgroundColor: item.category.color,
-                      },
-                    ]}
-                  />
+                  <View style={[styles.barTrack, isDarkMode && { backgroundColor: themeColors.surfaceSecondary }, isArabic && { flexDirection: 'row-reverse' }]}>
+                    <View
+                      style={[
+                        styles.barFill,
+                        {
+                          width: `${Math.max(item.percentage, 4)}%`,
+                          backgroundColor: barColor,
+                        },
+                      ]}
+                    />
+                  </View>
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
         </View>
 
-        {/* 3. WEEKDAY PATTERN */}
-        <View style={[styles.card, SHADOWS.small]}>
+        {/* 2B. DAILY TOTAL SPENDING IN CURRENT FISCAL MONTH */}
+        <View style={[styles.card, SHADOWS.small, isDarkMode && { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
           <View style={[styles.cardHeader, isArabic && { alignItems: 'flex-end' }]}>
-            <Text style={styles.cardTitle}>
+            <Text style={[styles.cardTitle, isDarkMode && { color: themeColors.textPrimary }]}>
+              {isArabic ? 'إجمالي مصاريف كل يوم في الشهر 📅' : 'Daily Total Expenses in Month 📅'}
+            </Text>
+            <Text style={[styles.cardSub, isDarkMode && { color: themeColors.textSecondary }]}>
+              {isArabic
+                ? `عدد الأيام التي بها مصروفات: ${dailySpendingList.list.length} يوم • الأحدث أولاً`
+                : `Active spending days: ${dailySpendingList.list.length} days • Newest first`}
+            </Text>
+          </View>
+
+          {dailySpendingList.list.length === 0 ? (
+            <Text style={{ fontSize: 12, color: isDarkMode ? themeColors.textSecondary : COLORS.textMuted, textAlign: 'center', paddingVertical: 12 }}>
+              {isArabic ? 'لا توجد مصروفات مسجلة في هذا الشهر المالي بعد' : 'No expenses logged in this fiscal month yet'}
+            </Text>
+          ) : (
+            <View style={{ gap: 9 }}>
+              {dailySpendingList.list.map((dItem) => {
+                const barPct = Math.max(6, Math.round((dItem.total / dailySpendingList.maxDaily) * 100));
+                const isPeak = dItem.total === dailySpendingList.maxDaily && dailySpendingList.list.length > 1;
+                return (
+                  <View
+                    key={dItem.date}
+                    style={{
+                      backgroundColor: isDarkMode ? themeColors.surfaceSecondary : '#F8FAFC',
+                      borderRadius: 11,
+                      padding: 10,
+                      borderWidth: 1,
+                      borderColor: isDarkMode
+                        ? (isPeak ? themeColors.primary : themeColors.border)
+                        : (isPeak ? '#FCA5A5' : '#E2E8F0'),
+                    }}
+                  >
+                    <View style={[{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5, gap: 6 }, isArabic && { flexDirection: 'row-reverse' }]}>
+                      <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1, minWidth: 0, flexWrap: 'wrap' }, isArabic && { flexDirection: 'row-reverse' }]}>
+                        <Text style={{ fontSize: 11.5, fontWeight: '800', color: isDarkMode ? themeColors.textPrimary : COLORS.textPrimary }}>
+                          {dItem.date}
+                        </Text>
+                        {!!dItem.dayName && (
+                          <Text style={{ fontSize: 10.5, fontWeight: '700', color: isDarkMode ? themeColors.textSecondary : COLORS.textSecondary }}>
+                            ({dItem.dayName})
+                          </Text>
+                        )}
+                        <Text style={{ fontSize: 9.5, fontWeight: '700', color: isDarkMode ? themeColors.textMuted : COLORS.textMuted }}>
+                          • {dItem.count} {isArabic ? 'حركة' : 'tx'}
+                        </Text>
+                      </View>
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: '900',
+                          flexShrink: 0,
+                          color: isDarkMode
+                            ? (isPeak ? themeColors.expense : themeColors.primary)
+                            : (isPeak ? '#DC2626' : COLORS.primaryDark),
+                        }}
+                      >
+                        {formatAmount(dItem.total)} {currency.symbol}
+                      </Text>
+                    </View>
+                    <View style={[styles.barTrack, isDarkMode && { backgroundColor: themeColors.primaryUltraLight }, isArabic && { flexDirection: 'row-reverse' }]}>
+                      <View
+                        style={[
+                          styles.barFill,
+                          {
+                            width: `${barPct}%`,
+                            backgroundColor: isDarkMode
+                              ? (isPeak ? themeColors.expense : themeColors.primary)
+                              : (isPeak ? '#DC2626' : themeColors.primary),
+                          },
+                        ]}
+                      />
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+        </View>
+
+        {/* 3. WEEKDAY PATTERN */}
+        <View style={[styles.card, SHADOWS.small, isDarkMode && { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
+          <View style={[styles.cardHeader, isArabic && { alignItems: 'flex-end' }]}>
+            <Text style={[styles.cardTitle, isDarkMode && { color: themeColors.textPrimary }]}>
               {isArabic ? 'توزيع الصرف حسب أيام الأسبوع' : 'Spending by Day of Week'}
             </Text>
-            <View style={styles.highestDayPill}>
-              <Text style={styles.highestDayText}>
+            <View style={[styles.highestDayPill, isDarkMode && { backgroundColor: themeColors.surfaceSecondary, borderWidth: 1, borderColor: themeColors.border }]}>
+              <Text style={[styles.highestDayText, isDarkMode && { color: themeColors.primary }]}>
                 {isArabic
                   ? `${weekdayPattern.maxDay.name} هو الأعلى صرفاً 🔥 (${formatAmount(weekdayPattern.maxDay.total)} ${currency.symbol})`
                   : `${weekdayPattern.maxDay.name} is highest 🔥 (${formatAmount(weekdayPattern.maxDay.total)} ${currency.symbol})`}
@@ -305,16 +553,18 @@ export const InsightsScreen = () => {
 
               return (
                 <View key={day.id} style={styles.weekdayColumn}>
-                  <Text style={styles.colAmt}>
+                  <Text style={[styles.colAmt, isDarkMode && { color: themeColors.textSecondary }]}>
                     {day.total > 0 ? formatAmount(day.total) : '0'}
                   </Text>
-                  <View style={styles.colTrack}>
+                  <View style={[styles.colTrack, isDarkMode && { backgroundColor: themeColors.surfaceSecondary }]}>
                     <View
                       style={[
                         styles.colFill,
                         {
                           height: `${heightPct}%`,
-                          backgroundColor: isMax ? '#EF4444' : COLORS.primary,
+                          backgroundColor: isDarkMode
+                            ? (isMax ? themeColors.expense : themeColors.primary)
+                            : (isMax ? '#EF4444' : COLORS.primary),
                         },
                       ]}
                     />
@@ -322,8 +572,9 @@ export const InsightsScreen = () => {
                   <Text
                     style={[
                       styles.colName,
+                      isDarkMode && { color: themeColors.textSecondary },
                       (day.id === 4 || day.name === 'الخميس' || day.name.length > 5) && { fontSize: 8.5 },
-                      isMax && styles.colNameMax,
+                      isMax && [styles.colNameMax, isDarkMode && { color: themeColors.primary }],
                     ]}
                     numberOfLines={1}
                     adjustsFontSizeToFit={true}
@@ -338,30 +589,30 @@ export const InsightsScreen = () => {
         </View>
 
         {/* 4. BIGGEST EXPENSES (TOP 10) */}
-        <View style={[styles.card, SHADOWS.small]}>
+        <View style={[styles.card, SHADOWS.small, isDarkMode && { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
           <View style={[styles.cardHeader, isArabic && { alignItems: 'flex-end' }]}>
-            <Text style={styles.cardTitle}>
+            <Text style={[styles.cardTitle, isDarkMode && { color: themeColors.textPrimary }]}>
               {isArabic ? 'أكبر 10 مصاريف مسجلة' : 'Top 10 Biggest Expenses'}
             </Text>
-            <Text style={styles.cardSub}>
+            <Text style={[styles.cardSub, isDarkMode && { color: themeColors.textSecondary }]}>
               {isArabic ? 'أعلى المعاملات الفردية قيمة في هذه الدورة' : 'Largest individual transactions recorded this period'}
             </Text>
           </View>
 
           {top10Expenses.map((tx, idx) => (
-            <View key={tx.id} style={[styles.top10Row, isArabic && { flexDirection: 'row-reverse' }]}>
-              <View style={[styles.top10RankBox, isArabic ? { marginLeft: 10, marginRight: 0 } : { marginRight: 10 }]}>
-                <Text style={styles.top10RankText}>#{idx + 1}</Text>
+            <View key={tx.id} style={[styles.top10Row, isDarkMode && { borderBottomColor: themeColors.border }, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View style={[styles.top10RankBox, isDarkMode && { backgroundColor: themeColors.surfaceSecondary, borderWidth: 1, borderColor: themeColors.border }, isArabic ? { marginLeft: 10, marginRight: 0 } : { marginRight: 10 }]}>
+                <Text style={[styles.top10RankText, isDarkMode && { color: themeColors.primary }]}>#{idx + 1}</Text>
               </View>
 
               <View style={[styles.top10Middle, isArabic && { alignItems: 'flex-end' }]}>
-                <Text style={styles.top10Note} numberOfLines={1}>
+                <Text style={[styles.top10Note, isDarkMode && { color: themeColors.textPrimary }]} numberOfLines={1}>
                   {tx.note || tx.categoryId}
                 </Text>
-                <Text style={styles.top10Date}>{tx.date}</Text>
+                <Text style={[styles.top10Date, isDarkMode && { color: themeColors.textMuted }]}>{tx.date}</Text>
               </View>
 
-              <Text style={styles.top10Amt}>
+              <Text style={[styles.top10Amt, isDarkMode && { color: themeColors.expense }]}>
                 -{formatAmount(tx.amount)} {currency.symbol}
               </Text>
             </View>
@@ -369,12 +620,12 @@ export const InsightsScreen = () => {
         </View>
 
         {/* 5. CREDIT CARD BILLS & GRACE PERIODS */}
-        <View style={[styles.card, SHADOWS.small]}>
+        <View style={[styles.card, SHADOWS.small, isDarkMode && { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
           <View style={[styles.cardHeader, isArabic && { alignItems: 'flex-end' }]}>
-            <Text style={styles.cardTitle}>
+            <Text style={[styles.cardTitle, isDarkMode && { color: themeColors.textPrimary }]}>
               {isArabic ? 'مديونيات ومواعيد سداد بطاقات الائتمان 💳' : 'Credit Card Bills & Due Dates 💳'}
             </Text>
-            <Text style={styles.cardSub}>
+            <Text style={[styles.cardSub, isDarkMode && { color: themeColors.textSecondary }]}>
               {isArabic
                 ? 'القاعدة: أي شراء بالكارت يستحق قبل يوم 25 من الشهر التالي'
                 : 'Rule: Any credit card purchase is due before the 25th of the FOLLOWING month'}
@@ -382,101 +633,101 @@ export const InsightsScreen = () => {
           </View>
 
           <View style={styles.billsTable}>
-            {/* Arab Bank due this month (25/11) */}
-            <View style={[styles.billRow, isArabic && { flexDirection: 'row-reverse' }]}>
+            {/* Arab Bank due this month */}
+            <View style={[styles.billRow, isDarkMode && { borderBottomColor: themeColors.border }, isArabic && { flexDirection: 'row-reverse' }]}>
               <View style={[{ flex: 1.4 }, isArabic && { alignItems: 'flex-end' }]}>
-                <Text style={styles.billName}>
+                <Text style={[styles.billName, isDarkMode && { color: themeColors.textPrimary }]}>
                   {isArabic ? 'البنك العربي (الشهر الحالي)' : 'Arab Bank (Current Month)'}
                 </Text>
-                <Text style={{ fontSize: 10, color: COLORS.textMuted }}>
+                <Text style={{ fontSize: 10, color: isDarkMode ? themeColors.textMuted : COLORS.textMuted }}>
                   {isArabic
-                    ? `${formatAmount(balances.ccArCarryOverLeft)} مرحل + ${formatAmount(balances.ccArPurchasesDueThisMonth)} مشتريات أكتوبر`
-                    : `${formatAmount(balances.ccArCarryOverLeft)} carry-over + ${formatAmount(balances.ccArPurchasesDueThisMonth)} Oct purchases`}
+                    ? `${formatAmount(balances.ccArCarryOverLeft)} مرحل + ${formatAmount(balances.ccArPurchasesDueThisMonth)} مشتريات مستحقة`
+                    : `${formatAmount(balances.ccArCarryOverLeft)} carry-over + ${formatAmount(balances.ccArPurchasesDueThisMonth)} due purchases`}
                 </Text>
               </View>
-              <Text style={styles.billDue}>
+              <Text style={[styles.billDue, isDarkMode && { color: themeColors.textSecondary }]}>
                 {isArabic ? `مستحق ${balances.currentMonthDueDate}` : `Due ${balances.currentMonthDueDate}`}
               </Text>
-              <Text style={[styles.billAmt, { color: '#DC2626' }, isArabic && { textAlign: 'left' }]}>
+              <Text style={[styles.billAmt, { color: isDarkMode ? themeColors.expense : '#DC2626' }, isArabic && { textAlign: 'left' }]}>
                 {formatAmount(balances.ccArDueThisMonth)} {currency.symbol}
               </Text>
             </View>
 
-            {/* Arab Bank due next month (25/12) */}
+            {/* Arab Bank due next month */}
             {balances.ccArDueNextMonth > 0 && (
-              <View style={[styles.billRow, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View style={[styles.billRow, isDarkMode && { borderBottomColor: themeColors.border }, isArabic && { flexDirection: 'row-reverse' }]}>
                 <View style={[{ flex: 1.4 }, isArabic && { alignItems: 'flex-end' }]}>
-                  <Text style={styles.billName}>
+                  <Text style={[styles.billName, isDarkMode && { color: themeColors.textPrimary }]}>
                     {isArabic ? 'البنك العربي (الشهر القادم)' : 'Arab Bank (Next Month)'}
                   </Text>
-                  <Text style={{ fontSize: 10, color: COLORS.textMuted }}>
-                    {isArabic ? 'مشتريات نوفمبر • تُسدد الشهر القادم' : 'Nov purchases • Due next month'}
+                  <Text style={{ fontSize: 10, color: isDarkMode ? themeColors.textMuted : COLORS.textMuted }}>
+                    {isArabic ? 'مشتريات تُسدد الشهر القادم' : 'Purchases due next month'}
                   </Text>
                 </View>
-                <Text style={styles.billDue}>
+                <Text style={[styles.billDue, isDarkMode && { color: themeColors.textSecondary }]}>
                   {isArabic ? `مستحق ${balances.nextMonthDueDate}` : `Due ${balances.nextMonthDueDate}`}
                 </Text>
-                <Text style={[styles.billAmt, { color: '#EA580C' }, isArabic && { textAlign: 'left' }]}>
+                <Text style={[styles.billAmt, { color: isDarkMode ? themeColors.warning : '#EA580C' }, isArabic && { textAlign: 'left' }]}>
                   {formatAmount(balances.ccArDueNextMonth)} {currency.symbol}
                 </Text>
               </View>
             )}
 
-            {/* Credit Agricole due this month (25/11) if any */}
+            {/* Credit Agricole due this month if any */}
             {balances.ccCaDueThisMonth > 0 && (
-              <View style={[styles.billRow, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View style={[styles.billRow, isDarkMode && { borderBottomColor: themeColors.border }, isArabic && { flexDirection: 'row-reverse' }]}>
                 <View style={[{ flex: 1.4 }, isArabic && { alignItems: 'flex-end' }]}>
-                  <Text style={styles.billName}>
+                  <Text style={[styles.billName, isDarkMode && { color: themeColors.textPrimary }]}>
                     {isArabic ? 'كريدي أجريكول (الشهر الحالي)' : 'Crédit Agricole (Current Month)'}
                   </Text>
-                  <Text style={{ fontSize: 10, color: COLORS.textMuted }}>
+                  <Text style={{ fontSize: 10, color: isDarkMode ? themeColors.textMuted : COLORS.textMuted }}>
                     {isArabic ? 'مشتريات الشهر السابق المستحقة هذا الشهر' : 'Previous month purchases due this month'}
                   </Text>
                 </View>
-                <Text style={styles.billDue}>
+                <Text style={[styles.billDue, isDarkMode && { color: themeColors.textSecondary }]}>
                   {isArabic ? `مستحق ${balances.currentMonthDueDate}` : `Due ${balances.currentMonthDueDate}`}
                 </Text>
-                <Text style={[styles.billAmt, { color: '#DC2626' }, isArabic && { textAlign: 'left' }]}>
+                <Text style={[styles.billAmt, { color: isDarkMode ? themeColors.expense : '#DC2626' }, isArabic && { textAlign: 'left' }]}>
                   {formatAmount(balances.ccCaDueThisMonth)} {currency.symbol}
                 </Text>
               </View>
             )}
 
-            {/* Credit Agricole due next month (25/12) */}
-            <View style={[styles.billRow, isArabic && { flexDirection: 'row-reverse' }]}>
+            {/* Credit Agricole due next month */}
+            <View style={[styles.billRow, isDarkMode && { borderBottomColor: themeColors.border }, isArabic && { flexDirection: 'row-reverse' }]}>
               <View style={[{ flex: 1.4 }, isArabic && { alignItems: 'flex-end' }]}>
-                <Text style={styles.billName}>
+                <Text style={[styles.billName, isDarkMode && { color: themeColors.textPrimary }]}>
                   {isArabic ? 'كريدي أجريكول (الشهر القادم)' : 'Crédit Agricole (Next Month)'}
                 </Text>
-                <Text style={{ fontSize: 10, color: COLORS.textMuted }}>
+                <Text style={{ fontSize: 10, color: isDarkMode ? themeColors.textMuted : COLORS.textMuted }}>
                   {isArabic
                     ? `مشتريات الشهر الحالي • تُسدد يوم 25 الشهر التالي`
                     : `Current month purchases • Due 25th next month`}
                 </Text>
               </View>
-              <Text style={styles.billDue}>
+              <Text style={[styles.billDue, isDarkMode && { color: themeColors.textSecondary }]}>
                 {isArabic ? `مستحق ${balances.nextMonthDueDate}` : `Due ${balances.nextMonthDueDate}`}
               </Text>
-              <Text style={[styles.billAmt, { color: '#D97706' }, isArabic && { textAlign: 'left' }]}>
+              <Text style={[styles.billAmt, { color: isDarkMode ? themeColors.warning : '#D97706' }, isArabic && { textAlign: 'left' }]}>
                 {formatAmount(balances.ccCaDueNextMonth)} {currency.symbol}
               </Text>
             </View>
 
             {/* Custom Credit Cards in Insights Table */}
             {(balances.customCreditCardsSummary || []).map((cCard) => (
-              <View key={cCard.id} style={[styles.billRow, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View key={cCard.id} style={[styles.billRow, isDarkMode && { borderBottomColor: themeColors.border }, isArabic && { flexDirection: 'row-reverse' }]}>
                 <View style={[{ flex: 1.4 }, isArabic && { alignItems: 'flex-end' }]}>
-                  <Text style={styles.billName}>{cCard.bankName} (CC)</Text>
-                  <Text style={{ fontSize: 10, color: COLORS.textMuted }}>
+                  <Text style={[styles.billName, isDarkMode && { color: themeColors.textPrimary }]}>{cCard.bankName} (CC)</Text>
+                  <Text style={{ fontSize: 10, color: isDarkMode ? themeColors.textMuted : COLORS.textMuted }}>
                     {isArabic
                       ? `هذا الشهر: ${formatAmount(cCard.dueThisMonth)} • القادم: ${formatAmount(cCard.dueNextMonth)}`
                       : `This month: ${formatAmount(cCard.dueThisMonth)} • Next: ${formatAmount(cCard.dueNextMonth)}`}
                   </Text>
                 </View>
-                <Text style={styles.billDue}>
+                <Text style={[styles.billDue, isDarkMode && { color: themeColors.textSecondary }]}>
                   {cCard.dueThisMonth > 0 ? balances.currentMonthDueDate : balances.nextMonthDueDate}
                 </Text>
-                <Text style={[styles.billAmt, { color: '#D97706' }, isArabic && { textAlign: 'left' }]}>
+                <Text style={[styles.billAmt, { color: isDarkMode ? themeColors.warning : '#D97706' }, isArabic && { textAlign: 'left' }]}>
                   {formatAmount(cCard.totalDebt)} {currency.symbol}
                 </Text>
               </View>
@@ -486,16 +737,16 @@ export const InsightsScreen = () => {
             <View
               style={[
                 styles.billRow,
-                { backgroundColor: '#FEF2F2', paddingHorizontal: 10, borderRadius: 10 },
+                { backgroundColor: isDarkMode ? themeColors.surfaceSecondary : '#FEF2F2', paddingHorizontal: 10, borderRadius: 10, borderWidth: isDarkMode ? 1 : 0, borderColor: themeColors.border },
                 isArabic && { flexDirection: 'row-reverse' },
               ]}
             >
-              <Text style={[styles.billName, { color: '#991B1B', flex: 1.4 }, isArabic && { textAlign: 'right' }]}>
+              <Text style={[styles.billName, { color: isDarkMode ? themeColors.expense : '#991B1B', flex: 1.4 }, isArabic && { textAlign: 'right' }]}>
                 {isArabic
                   ? `واجب السداد قبل ${balances.currentMonthDueDate} (باقي ${balances.daysUntilCurrentDue} يوم)`
                   : `Total Due Before ${balances.currentMonthDueDate} (${balances.daysUntilCurrentDue}d left)`}
               </Text>
-              <Text style={[styles.billAmt, { color: '#DC2626' }, isArabic && { textAlign: 'left' }]}>
+              <Text style={[styles.billAmt, { color: isDarkMode ? themeColors.expense : '#DC2626' }, isArabic && { textAlign: 'left' }]}>
                 {formatAmount(balances.totalCcDueThisMonth)} {currency.symbol}
               </Text>
             </View>
@@ -503,42 +754,42 @@ export const InsightsScreen = () => {
             <View
               style={[
                 styles.billRow,
-                { backgroundColor: '#FFFBEB', paddingHorizontal: 10, borderRadius: 10, marginTop: 4 },
+                { backgroundColor: isDarkMode ? themeColors.surfaceSecondary : '#FFFBEB', paddingHorizontal: 10, borderRadius: 10, marginTop: 4, borderWidth: isDarkMode ? 1 : 0, borderColor: themeColors.border },
                 isArabic && { flexDirection: 'row-reverse' },
               ]}
             >
-              <Text style={[styles.billName, { color: '#92400E', flex: 1.4 }, isArabic && { textAlign: 'right' }]}>
+              <Text style={[styles.billName, { color: isDarkMode ? themeColors.warning : '#92400E', flex: 1.4 }, isArabic && { textAlign: 'right' }]}>
                 {isArabic
                   ? `مستحق قبل ${balances.nextMonthDueDate} (${balances.daysUntilNextDue} يوم سماح)`
                   : `Total Due Before ${balances.nextMonthDueDate} (${balances.daysUntilNextDue}d grace)`}
               </Text>
-              <Text style={[styles.billAmt, { color: '#D97706' }, isArabic && { textAlign: 'left' }]}>
+              <Text style={[styles.billAmt, { color: isDarkMode ? themeColors.warning : '#D97706' }, isArabic && { textAlign: 'left' }]}>
                 {formatAmount(balances.totalCcDueNextMonth)} {currency.symbol}
               </Text>
             </View>
 
-            <View style={[styles.billRow, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[styles.billRow, isDarkMode && { borderBottomColor: themeColors.border }, isArabic && { flexDirection: 'row-reverse' }]}>
               <View style={[{ flex: 1.4 }, isArabic && { alignItems: 'flex-end' }]}>
-                <Text style={styles.billName}>
+                <Text style={[styles.billName, isDarkMode && { color: themeColors.textPrimary }]}>
                   {isArabic ? 'إجمالي المسدد للكروت' : 'Total Card Payments Made'}
                 </Text>
-                <Text style={{ fontSize: 10, color: COLORS.textMuted }}>
+                <Text style={{ fontSize: 10, color: isDarkMode ? themeColors.textMuted : COLORS.textMuted }}>
                   {isArabic
                     ? `عربي: ${formatAmount(balances.ccArPaid)} • أجريكول: ${formatAmount(balances.ccCaPaid)}`
                     : `Arab Bank: ${formatAmount(balances.ccArPaid)} • Crédit Agricole: ${formatAmount(balances.ccCaPaid)}`}
                 </Text>
               </View>
-              <Text style={styles.billDue}>{isArabic ? 'تم السداد ✅' : 'Paid ✅'}</Text>
-              <Text style={[styles.billAmt, { color: '#059669' }, isArabic && { textAlign: 'left' }]}>
+              <Text style={[styles.billDue, isDarkMode && { color: themeColors.textSecondary }]}>{isArabic ? 'تم السداد ✅' : 'Paid ✅'}</Text>
+              <Text style={[styles.billAmt, { color: isDarkMode ? themeColors.income : '#059669' }, isArabic && { textAlign: 'left' }]}>
                 {formatAmount(balances.totalCcPaid)} {currency.symbol}
               </Text>
             </View>
 
-            <View style={[styles.billRow, styles.billTotalRow, isArabic && { flexDirection: 'row-reverse' }]}>
-              <Text style={[styles.billTotalText, isArabic && { textAlign: 'right' }]}>
+            <View style={[styles.billRow, styles.billTotalRow, isDarkMode && { borderTopColor: themeColors.border }, isArabic && { flexDirection: 'row-reverse' }]}>
+              <Text style={[styles.billTotalText, isDarkMode && { color: themeColors.textPrimary }, isArabic && { textAlign: 'right' }]}>
                 {isArabic ? 'إجمالي مديونية الكروت الكلية (الحالي + القادم)' : 'Total Combined Credit Card Debt'}
               </Text>
-              <Text style={[styles.billTotalAmt, isArabic && { textAlign: 'left' }]}>
+              <Text style={[styles.billTotalAmt, isDarkMode && { color: themeColors.expense }, isArabic && { textAlign: 'left' }]}>
                 {formatAmount(balances.totalCcDebt)} {currency.symbol}
               </Text>
             </View>
@@ -546,10 +797,10 @@ export const InsightsScreen = () => {
 
           {/* Live Credit Card Transactions List with Grace Period */}
           {ccTransactions.length > 0 && (
-            <View style={{ marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#E2E8F0' }}>
+            <View style={{ marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: isDarkMode ? themeColors.border : '#E2E8F0' }}>
               <Text
                 style={[
-                  { fontSize: 13, fontWeight: '800', color: COLORS.textPrimary, marginBottom: 8 },
+                  { fontSize: 13, fontWeight: '800', color: isDarkMode ? themeColors.textPrimary : COLORS.textPrimary, marginBottom: 8 },
                   isArabic && { textAlign: 'right' },
                 ]}
               >
@@ -573,14 +824,14 @@ export const InsightsScreen = () => {
                       : (isArabic ? 'البنك العربي (CC AR)' : 'Arab Bank (CC AR)'));
                 const grace = !isPaid ? getGracePeriodStats(tx.date, tx.dueDate) : null;
                 return (
-                  <View key={tx.id} style={[styles.top10Row, isArabic && { flexDirection: 'row-reverse' }]}>
+                  <View key={tx.id} style={[styles.top10Row, isDarkMode && { borderBottomColor: themeColors.border }, isArabic && { flexDirection: 'row-reverse' }]}>
                     <View style={[styles.top10Middle, isArabic && { alignItems: 'flex-end' }]}>
-                      <Text style={styles.top10Note} numberOfLines={1}>
+                      <Text style={[styles.top10Note, isDarkMode && { color: themeColors.textPrimary }]} numberOfLines={1}>
                         {tx.note || cardLabel}
                       </Text>
-                      <Text style={styles.top10Date}>{tx.date} • {cardLabel}</Text>
+                      <Text style={[styles.top10Date, isDarkMode && { color: themeColors.textMuted }]}>{tx.date} • {cardLabel}</Text>
                       {grace && (
-                        <Text style={{ fontSize: 10, color: '#2563EB', fontWeight: '700', marginTop: 2 }}>
+                        <Text style={{ fontSize: 10, color: isDarkMode ? themeColors.primary : '#2563EB', fontWeight: '700', marginTop: 2 }}>
                           {isArabic
                             ? `سداد قبل ${grace.dueDate} (${grace.totalGraceDays} يوم سماح • متبقي ${grace.remainingGraceDays} يوم)`
                             : `Due before ${grace.dueDate} (${grace.totalGraceDays}d grace • ${grace.remainingGraceDays}d left)`}

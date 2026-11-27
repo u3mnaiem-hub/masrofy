@@ -337,7 +337,7 @@ function MainApp() {
                   styles.iconWrap,
                   isActive && {
                     backgroundColor: isDarkMode ? themeColors.primaryLight : (themeColors.primaryUltraLight || themeColors.primaryLight),
-                    ...(isDarkMode ? { borderWidth: 1, borderColor: 'rgba(60, 232, 142, 0.35)', ...NEON_GLOW.soft } : {}),
+                    ...(isDarkMode ? { borderWidth: 1, borderColor: themeColors.border, ...NEON_GLOW.soft } : {}),
                   },
                 ]}
               >

@@ -23,7 +23,7 @@ import {
 } from '../utils/smartVoiceFlow';
 
 export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelSheet, onOpenPayCc, viewTrigger = 0 }) => {
-  const { balances, currency, formatAmount, isArabic, isDarkMode, isBalancesHidden, deletedAccountIds, themeColors } = useExpense();
+  const { balances, currency, formatAmount, isArabic, isDarkMode, isOliveDark, isBalancesHidden, deletedAccountIds, themeColors, alertPrefs } = useExpense();
   const [showPlasticCards, setShowPlasticCards] = useState(true);
   const [reduceMotionEnabled, setReduceMotionEnabled] = useState(false);
   const [foregroundCycle, setForegroundCycle] = useState(0);
@@ -80,19 +80,25 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
     isMeeza: isMeezaBankCard(d),
   }));
 
-  const customCreditPlasticCards = (balances.customCreditCardsSummary || []).map((c) => ({
-    id: c.id,
-    title: c.bankName,
-    typeBadge: LINKED_BADGE_MAP[c.linkedAccountType || 'credit'] || 'CREDIT CARD',
-    digits: isMeezaBankCard(c) ? '5078 •••• MEEZA' : '5200 •••• CARD',
-    amount: c.totalDebt,
-    subText: formatCardDueSub(c.dueThisMonth, c.dueNextMonth),
-    ratio: Math.min(100, Math.round(((c.totalDebt || 0) / 10000) * 100)),
-    bg: '#4C1D95',
-    accent: '#C4B5FD',
-    isCredit: true,
-    isMeeza: isMeezaBankCard(c),
-  }));
+  const customCreditPlasticCards = (balances.customCreditCardsSummary || []).map((c) => {
+    const limit = parseFloat(c.creditLimit) > 0 ? parseFloat(c.creditLimit) : 10000;
+    return {
+      id: c.id,
+      title: c.bankName,
+      typeBadge: LINKED_BADGE_MAP[c.linkedAccountType || 'credit'] || 'CREDIT CARD',
+      digits: isMeezaBankCard(c) ? '5078 •••• MEEZA' : '5200 •••• CARD',
+      amount: c.totalDebt,
+      subText: formatCardDueSub(c.dueThisMonth, c.dueNextMonth),
+      ratio: Math.min(100, Math.round(((c.totalDebt || 0) / limit) * 100)),
+      bg: '#4C1D95',
+      accent: '#C4B5FD',
+      isCredit: true,
+      isMeeza: isMeezaBankCard(c),
+    };
+  });
+
+  const ccArLimit = parseFloat(alertPrefs?.creditLimits?.cc_ar) || 3300;
+  const ccCaLimit = parseFloat(alertPrefs?.creditLimits?.cc_ca) || 15000;
 
   const bankCardsList = [
     {
@@ -133,7 +139,7 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
             digits: '5412 •••• 3910',
             amount: balances.ccArDebt,
             subText: formatCardDueSub(balances.ccArDueThisMonth, balances.ccArDueNextMonth),
-            ratio: Math.min(100, Math.round(((balances.ccArDebt || 0) / 10000) * 100)),
+            ratio: Math.min(100, Math.round(((balances.ccArDebt || 0) / ccArLimit) * 100)),
             bg: '#7DD3FC',
             accent: '#0369A1',
             isLightCard: true,
@@ -150,7 +156,7 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
             digits: '4916 •••• 7742',
             amount: balances.ccCaDebt,
             subText: formatCardDueSub(balances.ccCaDueThisMonth, balances.ccCaDueNextMonth),
-            ratio: Math.min(100, Math.round(((balances.ccCaDebt || 0) / 10000) * 100)),
+            ratio: Math.min(100, Math.round(((balances.ccCaDebt || 0) / ccCaLimit) * 100)),
             bg: '#064E3B',
             accent: '#34D399',
             isCredit: true,
@@ -296,7 +302,7 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
           styles.netContainer,
           isDarkMode && {
             backgroundColor: '#10241C',
-            borderColor: 'rgba(60, 232, 142, 0.45)',
+            borderColor: themeColors.border,
             borderWidth: 1.2,
             ...NEON_GLOW.subtle,
           },
@@ -468,23 +474,23 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 10, paddingBottom: 10, paddingHorizontal: 2 }}
+          contentContainerStyle={{ gap: 10, paddingBottom: 10, paddingHorizontal: 2, alignItems: 'center' }}
         >
           {bankCardsList.map((bc) => {
-            if (bc.isMeeza) {
-              // Real Egyptian Meeza Pyramids Card artwork — absolute-filled Image for exact edge-to-edge fit on Android
+            if (bc.isMeeza && !isOliveDark) {
+              // Real Egyptian Meeza Pyramids Card artwork — 85% compact real-card rectangular ratio (192x118)
               return (
                 <TouchableOpacity
                   key={bc.id}
                   activeOpacity={bc.isCredit ? 0.85 : 0.95}
                   onPress={() => bc.isCredit && onOpenPayCc && onOpenPayCc(bc.id)}
                   style={{
-                    width: 222,
-                    minHeight: 142,
-                    borderRadius: 16,
+                    width: 192,
+                    height: 118,
+                    borderRadius: 13,
                     overflow: 'hidden',
                     borderWidth: 1.5,
-                    borderColor: isDarkMode ? 'rgba(79, 209, 217, 0.45)' : '#1E3A8A',
+                    borderColor: isDarkMode ? themeColors.border : '#1E3A8A',
                     position: 'relative',
                     backgroundColor: '#4C1D95',
                   }}
@@ -506,17 +512,17 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
                   <View
                     style={{
                       ...StyleSheet.absoluteFillObject,
-                      backgroundColor: 'rgba(255, 255, 255, 0.30)',
+                      backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.22)' : 'rgba(255, 255, 255, 0.30)',
                     }}
                   />
-                  <View style={{ padding: 12, flex: 1, justifyContent: 'space-between' }}>
+                  <View style={{ paddingHorizontal: 9, paddingVertical: 7, flex: 1, justifyContent: 'space-between' }}>
                     <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <MaterialCommunityIcons name="integrated-circuit-chip" size={20} color="#B45309" />
-                        <MaterialCommunityIcons name="contactless-payment" size={16} color="#0B2545" />
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <MaterialCommunityIcons name="integrated-circuit-chip" size={14} color="#B45309" />
+                        <MaterialCommunityIcons name="contactless-payment" size={12} color="#0B2545" />
                       </View>
-                      <View style={{ backgroundColor: 'rgba(255,255,255,0.92)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
-                        <Text style={{ color: '#1E3A8A', fontSize: 9.5, fontWeight: '900' }}>
+                      <View style={{ backgroundColor: 'rgba(255,255,255,0.92)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
+                        <Text style={{ color: '#1E3A8A', fontSize: 7.5, fontWeight: '900' }}>
                           {isArabic ? 'ميزة • Meeza' : 'MEEZA'}
                         </Text>
                       </View>
@@ -526,71 +532,77 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
                       <Text
                         style={{
                           color: '#0B2545',
-                          fontSize: 13,
+                          fontSize: 10.5,
                           fontWeight: '900',
-                          marginTop: 6,
                           textAlign: isArabic ? 'right' : 'left',
                           textShadowColor: 'rgba(255,255,255,0.9)',
                           textShadowOffset: { width: 0, height: 1 },
-                          textShadowRadius: 3,
+                          textShadowRadius: 2,
                         }}
                         numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.75}
                       >
                         {bc.title}
                       </Text>
                       <Text
                         style={{
                           color: '#1E3A8A',
-                          fontSize: 10,
+                          fontSize: 8,
                           fontWeight: '800',
-                          letterSpacing: 1,
-                          marginTop: 1,
+                          letterSpacing: 0.6,
                           textAlign: isArabic ? 'right' : 'left',
                           textShadowColor: 'rgba(255,255,255,0.85)',
                           textShadowOffset: { width: 0, height: 1 },
                           textShadowRadius: 2,
                         }}
+                        numberOfLines={1}
                       >
                         {bc.digits}
                       </Text>
                     </View>
 
                     <View>
-                      <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 4 }}>
+                      <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
                         <Text
                           style={{
                             color: '#0B2545',
-                            fontSize: 17.5,
+                            fontSize: 13.5,
                             fontWeight: '900',
                             textShadowColor: 'rgba(255,255,255,0.95)',
                             textShadowOffset: { width: 0, height: 1 },
-                            textShadowRadius: 3,
+                            textShadowRadius: 2,
                           }}
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.72}
                         >
-                          {formatAmount(bc.amount)} <Text style={{ fontSize: 11, color: '#1E3A8A', fontWeight: '900' }}>{currency.symbol}</Text>
+                          {formatAmount(bc.amount)} <Text style={{ fontSize: 9, color: '#1E3A8A', fontWeight: '900' }}>{currency.symbol}</Text>
                         </Text>
                         {bc.isCredit && (
-                          <Text style={{ color: '#1E3A8A', fontSize: 10, fontWeight: '900' }}>
+                          <Text style={{ color: '#1E3A8A', fontSize: 8.5, fontWeight: '900' }}>
                             {isArabic ? 'سداد 💳' : 'Pay 💳'}
                           </Text>
                         )}
                       </View>
 
-                      <View style={{ height: 4, backgroundColor: 'rgba(255,255,255,0.55)', borderRadius: 3, marginTop: 5, overflow: 'hidden' }}>
+                      <View style={{ height: 3, backgroundColor: 'rgba(255,255,255,0.55)', borderRadius: 2, marginTop: 2.5, overflow: 'hidden' }}>
                         <View style={{ width: `${Math.max(5, bc.ratio)}%`, height: '100%', backgroundColor: '#1E3A8A' }} />
                       </View>
                       <Text
                         style={{
                           color: '#0B2545',
-                          fontSize: 9.5,
+                          fontSize: 7.8,
                           fontWeight: '800',
-                          marginTop: 4,
+                          marginTop: 2,
                           textAlign: isArabic ? 'right' : 'left',
                           textShadowColor: 'rgba(255,255,255,0.9)',
                           textShadowOffset: { width: 0, height: 1 },
                           textShadowRadius: 2,
                         }}
                         numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.7}
                       >
                         {bc.subText}
                       </Text>
@@ -601,77 +613,87 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
             }
 
             if (isDarkMode) {
-              // Sary-inspired obsidian glass cards: Emerald for Cash, Cyan-Teal for Debit Bank, Coral-Red for Credit Cards
-              const darkAccent = bc.isCredit ? themeColors.expense : bc.isWallet ? themeColors.primary : themeColors.info;
-              const darkBg = bc.isCredit ? '#1F1413' : bc.isWallet ? '#10221B' : '#0F1F22';
-              const darkBorder = bc.isCredit
-                ? 'rgba(242, 113, 88, 0.34)'
-                : bc.isWallet
-                ? 'rgba(60, 232, 142, 0.34)'
-                : 'rgba(79, 209, 217, 0.34)';
+              // Softened 50% Dark Cards OR 1980s Olive Monochrome CRT Cards — 85% rectangular real-card size (192x118)
+              const darkAccent = isOliveDark
+                ? (bc.isCredit ? '#839455' : bc.isWallet ? '#ABB97A' : '#97A965')
+                : (bc.isCredit ? themeColors.expense : bc.isWallet ? themeColors.primary : themeColors.info);
+              const darkBg = isOliveDark
+                ? (bc.isCredit ? '#161C10' : bc.isWallet ? '#1D2415' : '#181E12')
+                : (bc.isCredit ? '#251E1D' : bc.isWallet ? '#1B2521' : '#1A2325');
+              const darkBorder = isOliveDark
+                ? '#3D4B2B'
+                : themeColors.border;
               return (
                 <TouchableOpacity
                   key={bc.id}
                   activeOpacity={bc.isCredit ? 0.82 : 1}
                   onPress={() => bc.isCredit && onOpenPayCc && onOpenPayCc(bc.id)}
                   style={{
-                    width: 215,
+                    width: bc.isWallet ? 208 : 192,
+                    height: bc.isWallet ? 132 : 118,
                     backgroundColor: darkBg,
-                    borderRadius: 16,
-                    padding: 12,
+                    borderRadius: 13,
+                    paddingHorizontal: 9,
+                    paddingVertical: 7,
                     borderWidth: 1,
                     borderColor: darkBorder,
+                    justifyContent: 'space-between',
                   }}
                 >
                   <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <MaterialCommunityIcons name={bc.isWallet ? 'wallet-bifold' : 'integrated-circuit-chip'} size={19} color={darkAccent} />
-                      <MaterialCommunityIcons name={bc.isWallet ? 'cash-multiple' : 'contactless-payment'} size={15} color="#647A76" />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <MaterialCommunityIcons name={bc.isWallet ? 'wallet-bifold' : 'integrated-circuit-chip'} size={15} color={darkAccent} />
+                      <MaterialCommunityIcons name={bc.isWallet ? 'cash-multiple' : 'contactless-payment'} size={12} color={themeColors.textMuted} />
                     </View>
-                    <View style={{ backgroundColor: '#131D1B', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: darkBorder }}>
-                      <Text style={{ color: darkAccent, fontSize: 9, fontWeight: '800' }}>{bc.typeBadge}</Text>
+                    <View style={{ backgroundColor: themeColors.surface, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, borderWidth: 1, borderColor: darkBorder }}>
+                      <Text style={{ color: darkAccent, fontSize: 7.5, fontWeight: '800' }} numberOfLines={1}>{bc.typeBadge}</Text>
                     </View>
                   </View>
 
-                  <Text style={{ color: '#F3F7F6', fontSize: 12.5, fontWeight: '800', marginTop: 8, textAlign: isArabic ? 'right' : 'left' }} numberOfLines={1}>
-                    {bc.title}
-                  </Text>
-                  <Text style={{ color: '#647A76', fontSize: 10, letterSpacing: 1, marginTop: 1, textAlign: isArabic ? 'right' : 'left' }}>
-                    {bc.digits}
-                  </Text>
-
-                  <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 8 }}>
-                    <Text style={{ color: darkAccent, fontSize: 17, fontWeight: '900' }}>
-                      {formatAmount(bc.amount)} <Text style={{ fontSize: 11, color: '#9BB0AC' }}>{currency.symbol}</Text>
+                  <View>
+                    <Text style={{ color: themeColors.textPrimary, fontSize: 10.5, fontWeight: '800', textAlign: isArabic ? 'right' : 'left' }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                      {bc.title}
                     </Text>
-                    {bc.isCredit && (
-                      <Text style={{ color: themeColors.primary, fontSize: 10, fontWeight: '800' }}>
-                        {isArabic ? 'سداد 💳' : 'Pay 💳'}
-                      </Text>
-                    )}
+                    <Text style={{ color: themeColors.textMuted, fontSize: 8, letterSpacing: 0.6, textAlign: isArabic ? 'right' : 'left' }} numberOfLines={1}>
+                      {bc.digits}
+                    </Text>
                   </View>
 
-                  <View style={{ height: 4, backgroundColor: '#1B2A27', borderRadius: 3, marginTop: 6, overflow: 'hidden' }}>
-                    <View style={{ width: `${Math.max(5, bc.ratio)}%`, height: '100%', backgroundColor: darkAccent }} />
+                  <View>
+                    <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                      <Text style={{ color: darkAccent, fontSize: 13.5, fontWeight: '900' }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.72}>
+                        {formatAmount(bc.amount)} <Text style={{ fontSize: 9, color: themeColors.textSecondary }}>{currency.symbol}</Text>
+                      </Text>
+                      {bc.isCredit && (
+                        <Text style={{ color: themeColors.primary, fontSize: 8.5, fontWeight: '800' }}>
+                          {isArabic ? 'سداد 💳' : 'Pay 💳'}
+                        </Text>
+                      )}
+                    </View>
+
+                    <View style={{ height: 3, backgroundColor: themeColors.borderLight, borderRadius: 2, marginTop: 2.5, overflow: 'hidden' }}>
+                      <View style={{ width: `${Math.max(5, bc.ratio)}%`, height: '100%', backgroundColor: darkAccent }} />
+                    </View>
+                    <Text style={{ color: themeColors.textSecondary, fontSize: 7.8, marginTop: 2, textAlign: isArabic ? 'right' : 'left' }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                      {bc.subText}
+                    </Text>
                   </View>
-                  <Text style={{ color: '#9BB0AC', fontSize: 9.5, marginTop: 4, textAlign: isArabic ? 'right' : 'left' }} numberOfLines={1}>
-                    {bc.subText}
-                  </Text>
                 </TouchableOpacity>
               );
             }
 
             if (bc.isWallet) {
-              // Leather Pocket Wallet Design for Cash
+              // Leather Pocket Wallet Design for Cash — slightly taller classic wallet proportions (208x132)
               return (
                 <View
                   key={bc.id}
                   style={{
-                    width: 220,
+                    width: 208,
+                    height: 132,
                     backgroundColor: '#5C2D0C',
-                    borderRadius: 22,
-                    padding: 4,
-                    borderWidth: 2,
+                    borderRadius: 17,
+                    padding: 3.5,
+                    borderWidth: 1.5,
                     borderColor: '#3E1D06',
                     position: 'relative',
                   }}
@@ -679,41 +701,43 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
                   {/* Peeking Green Banknotes at top of wallet pocket */}
                   <View
                     style={{
-                      height: 6,
-                      marginHorizontal: 14,
+                      height: 4,
+                      marginHorizontal: 12,
                       backgroundColor: '#15803D',
-                      borderTopLeftRadius: 6,
-                      borderTopRightRadius: 6,
+                      borderTopLeftRadius: 5,
+                      borderTopRightRadius: 5,
                       borderWidth: 1,
                       borderColor: '#86EFAC',
-                      marginBottom: -2,
+                      marginBottom: -1.5,
                     }}
                   />
                   {/* Inner Stitched Leather Body */}
                   <View
                     style={{
+                      flex: 1,
                       backgroundColor: '#7C3A12',
-                      borderRadius: 17,
-                      padding: 11,
-                      borderWidth: 1.5,
+                      borderRadius: 12,
+                      padding: 8,
+                      borderWidth: 1.2,
                       borderStyle: 'dashed',
                       borderColor: '#F59E0B',
+                      justifyContent: 'space-between',
                     }}
                   >
                     {/* Leather Wallet Clasp / Snap Button on Left/Right edge */}
                     <View
                       style={{
                         position: 'absolute',
-                        top: '42%',
-                        [isArabic ? 'left' : 'right']: -4,
-                        width: 28,
-                        height: 24,
+                        top: '40%',
+                        [isArabic ? 'left' : 'right']: -3,
+                        width: 22,
+                        height: 18,
                         backgroundColor: '#451A03',
-                        borderTopLeftRadius: isArabic ? 4 : 12,
-                        borderBottomLeftRadius: isArabic ? 4 : 12,
-                        borderTopRightRadius: isArabic ? 12 : 4,
-                        borderBottomRightRadius: isArabic ? 12 : 4,
-                        borderWidth: 1.5,
+                        borderTopLeftRadius: isArabic ? 3 : 9,
+                        borderBottomLeftRadius: isArabic ? 3 : 9,
+                        borderTopRightRadius: isArabic ? 9 : 3,
+                        borderBottomRightRadius: isArabic ? 9 : 3,
+                        borderWidth: 1.2,
                         borderColor: '#D97706',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -722,45 +746,49 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
                     >
                       <View
                         style={{
-                          width: 10,
-                          height: 10,
-                          borderRadius: 5,
+                          width: 8,
+                          height: 8,
+                          borderRadius: 4,
                           backgroundColor: '#FBBF24',
-                          borderWidth: 1.5,
+                          borderWidth: 1,
                           borderColor: '#78350F',
                         }}
                       />
                     </View>
 
                     <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                        <MaterialCommunityIcons name="wallet-bifold" size={20} color="#FDE68A" />
-                        <MaterialCommunityIcons name="cash-multiple" size={16} color="#86EFAC" />
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <MaterialCommunityIcons name="wallet-bifold" size={16} color="#FDE68A" />
+                        <MaterialCommunityIcons name="cash-multiple" size={13} color="#86EFAC" />
                       </View>
-                      <View style={{ backgroundColor: '#451A03', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, borderWidth: 1, borderColor: '#D97706' }}>
-                        <Text style={{ color: '#FDE68A', fontSize: 9, fontWeight: '800' }}>{bc.typeBadge}</Text>
+                      <View style={{ backgroundColor: '#451A03', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 6, borderWidth: 1, borderColor: '#D97706' }}>
+                        <Text style={{ color: '#FDE68A', fontSize: 8, fontWeight: '800' }} numberOfLines={1}>{bc.typeBadge}</Text>
                       </View>
                     </View>
 
-                    <Text style={{ color: '#FEF3C7', fontSize: 13, fontWeight: '900', marginTop: 7, textAlign: isArabic ? 'right' : 'left' }} numberOfLines={1}>
-                      {bc.title}
-                    </Text>
-                    <Text style={{ color: '#FCD34D', fontSize: 9.5, fontWeight: '700', marginTop: 1, textAlign: isArabic ? 'right' : 'left' }}>
-                      {bc.digits}
-                    </Text>
-
-                    <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 6 }}>
-                      <Text style={{ color: '#FFFFFF', fontSize: 17, fontWeight: '900' }}>
-                        {formatAmount(bc.amount)} <Text style={{ fontSize: 11, color: '#FDE68A' }}>{currency.symbol}</Text>
+                    <View>
+                      <Text style={{ color: '#FEF3C7', fontSize: 11.5, fontWeight: '900', textAlign: isArabic ? 'right' : 'left' }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                        {bc.title}
+                      </Text>
+                      <Text style={{ color: '#FCD34D', fontSize: 8.5, fontWeight: '700', textAlign: isArabic ? 'right' : 'left' }} numberOfLines={1}>
+                        {bc.digits}
                       </Text>
                     </View>
 
-                    <View style={{ height: 4, backgroundColor: '#451A03', borderRadius: 3, marginTop: 6, overflow: 'hidden' }}>
-                      <View style={{ width: `${Math.max(5, bc.ratio)}%`, height: '100%', backgroundColor: '#FBBF24' }} />
+                    <View>
+                      <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                        <Text style={{ color: '#FFFFFF', fontSize: 14.5, fontWeight: '900' }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                          {formatAmount(bc.amount)} <Text style={{ fontSize: 9.5, color: '#FDE68A' }}>{currency.symbol}</Text>
+                        </Text>
+                      </View>
+
+                      <View style={{ height: 3.5, backgroundColor: '#451A03', borderRadius: 2, marginTop: 3, overflow: 'hidden' }}>
+                        <View style={{ width: `${Math.max(5, bc.ratio)}%`, height: '100%', backgroundColor: '#FBBF24' }} />
+                      </View>
+                      <Text style={{ color: '#FDE68A', fontSize: 8.5, marginTop: 2, textAlign: isArabic ? 'right' : 'left' }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                        {bc.subText}
+                      </Text>
                     </View>
-                    <Text style={{ color: '#FDE68A', fontSize: 9.5, marginTop: 4, textAlign: isArabic ? 'right' : 'left' }} numberOfLines={1}>
-                      {bc.subText}
-                    </Text>
                   </View>
                 </View>
               );
@@ -778,48 +806,55 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
                 activeOpacity={0.85}
                 onPress={() => bc.isCredit && onOpenPayCc && onOpenPayCc(bc.id)}
                 style={{
-                  width: 215,
+                  width: 192,
+                  height: 118,
                   backgroundColor: bc.bg,
-                  borderRadius: 16,
-                  padding: 12,
+                  borderRadius: 13,
+                  paddingHorizontal: 9,
+                  paddingVertical: 7,
                   borderWidth: 1.5,
                   borderColor: bc.isLightCard ? '#0284C7' : bc.accent + '55',
+                  justifyContent: 'space-between',
                 }}
               >
                 <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <MaterialCommunityIcons name="integrated-circuit-chip" size={20} color={bc.isLightCard ? '#D97706' : '#FBBF24'} />
-                    <MaterialCommunityIcons name="contactless-payment" size={16} color={bc.isLightCard ? '#0C4A6E' : '#E2E8F0'} />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <MaterialCommunityIcons name="integrated-circuit-chip" size={14} color={bc.isLightCard ? '#D97706' : '#FBBF24'} />
+                    <MaterialCommunityIcons name="contactless-payment" size={12} color={bc.isLightCard ? '#0C4A6E' : '#E2E8F0'} />
                   </View>
-                  <View style={{ backgroundColor: bc.isLightCard ? '#E0F2FE' : bc.accent + '33', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 }}>
-                    <Text style={{ color: bc.accent, fontSize: 9, fontWeight: '800' }}>{bc.typeBadge}</Text>
+                  <View style={{ backgroundColor: bc.isLightCard ? '#E0F2FE' : bc.accent + '33', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
+                    <Text style={{ color: bc.accent, fontSize: 7.5, fontWeight: '800' }} numberOfLines={1}>{bc.typeBadge}</Text>
                   </View>
                 </View>
 
-                <Text style={{ color: titleColor, fontSize: 12.5, fontWeight: '800', marginTop: 8, textAlign: isArabic ? 'right' : 'left' }} numberOfLines={1}>
-                  {bc.title}
-                </Text>
-                <Text style={{ color: digitsColor, fontSize: 10, letterSpacing: 1, marginTop: 1, textAlign: isArabic ? 'right' : 'left' }}>
-                  {bc.digits}
-                </Text>
-
-                <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 8 }}>
-                  <Text style={{ color: amountColor, fontSize: 17, fontWeight: '900' }}>
-                    {formatAmount(bc.amount)} <Text style={{ fontSize: 11, color: bc.accent }}>{currency.symbol}</Text>
+                <View>
+                  <Text style={{ color: titleColor, fontSize: 10.5, fontWeight: '800', textAlign: isArabic ? 'right' : 'left' }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                    {bc.title}
                   </Text>
-                  {bc.isCredit && (
-                    <Text style={{ color: bc.accent, fontSize: 10, fontWeight: '800' }}>
-                      {isArabic ? 'سداد 💳' : 'Pay 💳'}
-                    </Text>
-                  )}
+                  <Text style={{ color: digitsColor, fontSize: 8, letterSpacing: 0.6, textAlign: isArabic ? 'right' : 'left' }} numberOfLines={1}>
+                    {bc.digits}
+                  </Text>
                 </View>
 
-                <View style={{ height: 4, backgroundColor: barBg, borderRadius: 3, marginTop: 6, overflow: 'hidden' }}>
-                  <View style={{ width: `${Math.max(5, bc.ratio)}%`, height: '100%', backgroundColor: bc.accent }} />
+                <View>
+                  <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <Text style={{ color: amountColor, fontSize: 13.5, fontWeight: '900' }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.72}>
+                      {formatAmount(bc.amount)} <Text style={{ fontSize: 9, color: bc.accent }}>{currency.symbol}</Text>
+                    </Text>
+                    {bc.isCredit && (
+                      <Text style={{ color: bc.accent, fontSize: 8.5, fontWeight: '800' }}>
+                        {isArabic ? 'سداد 💳' : 'Pay 💳'}
+                      </Text>
+                    )}
+                  </View>
+
+                  <View style={{ height: 3, backgroundColor: barBg, borderRadius: 2, marginTop: 2.5, overflow: 'hidden' }}>
+                    <View style={{ width: `${Math.max(5, bc.ratio)}%`, height: '100%', backgroundColor: bc.accent }} />
+                  </View>
+                  <Text style={{ color: subColor, fontSize: 7.8, marginTop: 2, textAlign: isArabic ? 'right' : 'left' }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                    {bc.subText}
+                  </Text>
                 </View>
-                <Text style={{ color: subColor, fontSize: 9.5, marginTop: 4, textAlign: isArabic ? 'right' : 'left' }} numberOfLines={1}>
-                  {bc.subText}
-                </Text>
               </TouchableOpacity>
             );
           })}
@@ -830,23 +865,23 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
         {/* Row 1: كاش و DC بنك جنباً إلى جنب */}
         <View style={[styles.blocksPairRow, isArabic && { flexDirection: 'row-reverse' }]}>
           {/* Block 1: كاش (Cash) */}
-          <View style={[styles.accountCard, styles.beigeCard, isDarkMode && styles.darkBeigeCard, { flex: 1 }, isArabic && { alignItems: 'flex-end' }]}>
+          <View style={[styles.accountCard, styles.beigeCard, isDarkMode && styles.darkBeigeCard, isOliveDark && { backgroundColor: themeColors.surfaceSecondary, borderColor: themeColors.border }, { flex: 1 }, isArabic && { alignItems: 'flex-end' }]}>
             <View style={[styles.accountTop, isArabic && { flexDirection: 'row-reverse' }]}>
               <Text
-                style={[styles.accountName, styles.beigeText, isDarkMode && styles.darkBeigeText, isArabic && { textAlign: 'right' }]}
+                style={[styles.accountName, styles.beigeText, isDarkMode && styles.darkBeigeText, isOliveDark && { color: themeColors.textPrimary }, isArabic && { textAlign: 'right' }]}
                 numberOfLines={1}
                 adjustsFontSizeToFit={true}
                 minimumFontScale={0.75}
               >
                 {isArabic ? 'كاش (Cash)' : 'Cash'}
               </Text>
-              <MaterialCommunityIcons name="cash" size={15} color={isDarkMode ? '#D9B872' : '#B45309'} />
+              <MaterialCommunityIcons name="cash" size={15} color={isDarkMode ? themeColors.primary : '#B45309'} />
             </View>
-            <Text style={[styles.accountAmount, styles.beigeText, isDarkMode && styles.darkBeigeText]} numberOfLines={1}>
+            <Text style={[styles.accountAmount, styles.beigeText, isDarkMode && styles.darkBeigeText, isOliveDark && { color: themeColors.primary }]} numberOfLines={1}>
               {formatAmount(balances.availCsh)} {currency.symbol}
             </Text>
             <Text
-              style={[styles.accountSub, styles.beigeSubText, isDarkMode && styles.darkBeigeSubText]}
+              style={[styles.accountSub, styles.beigeSubText, isDarkMode && styles.darkBeigeSubText, isOliveDark && { color: themeColors.textSecondary }]}
               numberOfLines={1}
               adjustsFontSizeToFit={true}
               minimumFontScale={0.75}
@@ -855,30 +890,38 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
             </Text>
           </View>
 
-          {/* Block 2: DC / حساب بنكي */}
-          {!isDeleted('dc') && (
-            <View style={[styles.accountCard, styles.beigeCard, isDarkMode && styles.darkBeigeCard, { flex: 1 }, isArabic && { alignItems: 'flex-end' }]}>
+          {/* Block 2: DC / الحساب البنكي (شامل كروت الديبيت والدفع المسبق والمرتبات مثل ميزة) */}
+          {(!isDeleted('dc') || (balances.customDebitCardsSummary || []).length > 0) && (
+            <View style={[styles.accountCard, styles.beigeCard, isDarkMode && styles.darkBeigeCard, isOliveDark && { backgroundColor: themeColors.surfaceSecondary, borderColor: themeColors.border }, { flex: 1 }, isArabic && { alignItems: 'flex-end' }]}>
               <View style={[styles.accountTop, isArabic && { flexDirection: 'row-reverse' }]}>
                 <Text
-                  style={[styles.accountName, styles.beigeText, isDarkMode && styles.darkBeigeText, isArabic && { textAlign: 'right' }]}
+                  style={[styles.accountName, styles.beigeText, isDarkMode && styles.darkBeigeText, isOliveDark && { color: themeColors.textPrimary }, isArabic && { textAlign: 'right' }]}
                   numberOfLines={1}
                   adjustsFontSizeToFit={true}
-                  minimumFontScale={0.75}
+                  minimumFontScale={0.7}
                 >
-                  {isArabic ? 'DC / حساب بنكي' : 'DC / Bank'}
+                  {(() => {
+                    const totalDebitCount = (isDeleted('dc') ? 0 : 1) + (balances.customDebitCardsSummary || []).length;
+                    if (totalDebitCount > 1) {
+                      return isArabic ? `DC / بنكي (${totalDebitCount} كروت)` : `DC / Bank (${totalDebitCount} cards)`;
+                    }
+                    return isArabic ? 'DC / حساب بنكي' : 'DC / Bank';
+                  })()}
                 </Text>
-                <MaterialCommunityIcons name="credit-card" size={15} color={isDarkMode ? '#D9B872' : '#B45309'} />
+                <MaterialCommunityIcons name="credit-card" size={15} color={isDarkMode ? themeColors.primary : '#B45309'} />
               </View>
-              <Text style={[styles.accountAmount, styles.beigeText, isDarkMode && styles.darkBeigeText]} numberOfLines={1}>
-                {formatAmount(balances.availDc)} {currency.symbol}
+              <Text style={[styles.accountAmount, styles.beigeText, isDarkMode && styles.darkBeigeText, isOliveDark && { color: themeColors.primary }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                {formatAmount((isDeleted('dc') ? 0 : (balances.availDc || 0)) + (balances.customDebitTotalAvail || 0))} {currency.symbol}
               </Text>
               <Text
-                style={[styles.accountSub, styles.beigeSubText, isDarkMode && styles.darkBeigeSubText]}
+                style={[styles.accountSub, styles.beigeSubText, isDarkMode && styles.darkBeigeSubText, isOliveDark && { color: themeColors.textSecondary }]}
                 numberOfLines={1}
                 adjustsFontSizeToFit={true}
-                minimumFontScale={0.75}
+                minimumFontScale={0.7}
               >
-                {isArabic ? `بدأنا بـ ${formatAmount(balances.startDc)}` : `Start ${formatAmount(balances.startDc)}`}
+                {isArabic
+                  ? `بدأنا بـ ${formatAmount((isDeleted('dc') ? 0 : (balances.startDc || 0)) + (balances.customDebitTotalStart || 0))}`
+                  : `Start ${formatAmount((isDeleted('dc') ? 0 : (balances.startDc || 0)) + (balances.customDebitTotalStart || 0))}`}
               </Text>
             </View>
           )}
@@ -890,13 +933,13 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
             {/* Block 3: كريدي أجريكول (CC CA) */}
             {!isDeleted('cc_ca') && (
               <TouchableOpacity
-                style={[styles.accountCard, styles.greenCaCard, isDarkMode && styles.darkGreenCaCard, { flex: 1 }, isArabic && { alignItems: 'flex-end' }]}
+                style={[styles.accountCard, styles.greenCaCard, isDarkMode && styles.darkGreenCaCard, isOliveDark && { backgroundColor: themeColors.surface, borderColor: themeColors.border }, { flex: 1 }, isArabic && { alignItems: 'flex-end' }]}
                 onPress={() => onOpenPayCc && onOpenPayCc('cc_ca')}
                 activeOpacity={0.75}
               >
                 <View style={[styles.accountTop, isArabic && { flexDirection: 'row-reverse' }]}>
                   <Text
-                    style={[styles.accountName, styles.greenCaText, isDarkMode && styles.darkGreenCaText, isArabic && { textAlign: 'right' }]}
+                    style={[styles.accountName, styles.greenCaText, isDarkMode && styles.darkGreenCaText, isOliveDark && { color: themeColors.textPrimary }, isArabic && { textAlign: 'right' }]}
                     numberOfLines={1}
                     adjustsFontSizeToFit={true}
                     minimumFontScale={0.75}
@@ -904,17 +947,17 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
                     {isArabic ? 'أجريكول (CC CA)' : 'Crédit Agricole'}
                   </Text>
                   <View style={[styles.payBadgeRow, isArabic && { flexDirection: 'row-reverse' }]}>
-                    <View style={[styles.payBadgeGreen, isDarkMode && { backgroundColor: '#2E4C3E' }]}>
-                      <Text style={[styles.payBadgeGreenText, isDarkMode && { color: '#9EE0BE' }]}>{isArabic ? 'سداد 💳' : 'Pay'}</Text>
+                    <View style={[styles.payBadgeGreen, isDarkMode && { backgroundColor: themeColors.primaryLight, borderWidth: 1, borderColor: themeColors.border }]}>
+                      <Text style={[styles.payBadgeGreenText, isDarkMode && { color: themeColors.primary }]}>{isArabic ? 'سداد 💳' : 'Pay'}</Text>
                     </View>
-                    <MaterialCommunityIcons name="credit-card-outline" size={14} color={isDarkMode ? '#8ED6B3' : '#065F46'} />
+                    <MaterialCommunityIcons name="credit-card-outline" size={14} color={isDarkMode ? themeColors.primary : '#065F46'} />
                   </View>
                 </View>
-                <Text style={[styles.accountAmount, styles.greenCaText, isDarkMode && styles.darkGreenCaText]} numberOfLines={1}>
+                <Text style={[styles.accountAmount, styles.greenCaText, isDarkMode && styles.darkGreenCaText, isOliveDark && { color: themeColors.expense }]} numberOfLines={1}>
                   {formatAmount(balances.ccCaDebt)} {currency.symbol}
                 </Text>
                 <Text
-                  style={[styles.accountSub, styles.greenCaSubText, isDarkMode && styles.darkGreenCaSubText]}
+                  style={[styles.accountSub, styles.greenCaSubText, isDarkMode && styles.darkGreenCaSubText, isOliveDark && { color: themeColors.textSecondary }]}
                   numberOfLines={1}
                   adjustsFontSizeToFit={true}
                   minimumFontScale={0.75}
@@ -927,13 +970,13 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
             {/* Block 4: البنك العربي (CC AR) */}
             {!isDeleted('cc_ar') && (
               <TouchableOpacity
-                style={[styles.accountCard, styles.blueArCard, isDarkMode && styles.darkBlueArCard, { flex: 1 }, isArabic && { alignItems: 'flex-end' }]}
+                style={[styles.accountCard, styles.blueArCard, isDarkMode && styles.darkBlueArCard, isOliveDark && { backgroundColor: themeColors.surface, borderColor: themeColors.border }, { flex: 1 }, isArabic && { alignItems: 'flex-end' }]}
                 onPress={() => onOpenPayCc && onOpenPayCc('cc_ar')}
                 activeOpacity={0.75}
               >
                 <View style={[styles.accountTop, isArabic && { flexDirection: 'row-reverse' }]}>
                   <Text
-                    style={[styles.accountName, styles.blueArText, isDarkMode && styles.darkBlueArText, isArabic && { textAlign: 'right' }]}
+                    style={[styles.accountName, styles.blueArText, isDarkMode && styles.darkBlueArText, isOliveDark && { color: themeColors.textPrimary }, isArabic && { textAlign: 'right' }]}
                     numberOfLines={1}
                     adjustsFontSizeToFit={true}
                     minimumFontScale={0.75}
@@ -941,17 +984,17 @@ export const BalanceCard = ({ onOpenAddExpense, onOpenAddIncome, onOpenExcelShee
                     {isArabic ? 'العربي (CC AR)' : 'Arab Bank (CC)'}
                   </Text>
                   <View style={[styles.payBadgeRow, isArabic && { flexDirection: 'row-reverse' }]}>
-                    <View style={[styles.payBadgeBlue, isDarkMode && { backgroundColor: '#314460' }]}>
-                      <Text style={[styles.payBadgeBlueText, isDarkMode && { color: '#A5C8F5' }]}>{isArabic ? 'سداد 💳' : 'Pay'}</Text>
+                    <View style={[styles.payBadgeBlue, isDarkMode && { backgroundColor: themeColors.primaryLight, borderWidth: 1, borderColor: themeColors.border }]}>
+                      <Text style={[styles.payBadgeBlueText, isDarkMode && { color: themeColors.primary }]}>{isArabic ? 'سداد 💳' : 'Pay'}</Text>
                     </View>
-                    <MaterialCommunityIcons name="credit-card-clock" size={14} color={isDarkMode ? '#93BCEF' : '#1E40AF'} />
+                    <MaterialCommunityIcons name="credit-card-clock" size={14} color={isDarkMode ? themeColors.primary : '#1E40AF'} />
                   </View>
                 </View>
-                <Text style={[styles.accountAmount, styles.blueArText, isDarkMode && styles.darkBlueArText]} numberOfLines={1}>
+                <Text style={[styles.accountAmount, styles.blueArText, isDarkMode && styles.darkBlueArText, isOliveDark && { color: themeColors.expense }]} numberOfLines={1}>
                   {formatAmount(balances.ccArDebt)} {currency.symbol}
                 </Text>
                 <Text
-                  style={[styles.accountSub, styles.blueArSubText, isDarkMode && styles.darkBlueArSubText]}
+                  style={[styles.accountSub, styles.blueArSubText, isDarkMode && styles.darkBlueArSubText, isOliveDark && { color: themeColors.textSecondary }]}
                   numberOfLines={1}
                   adjustsFontSizeToFit={true}
                   minimumFontScale={0.75}
@@ -1352,36 +1395,36 @@ const styles = StyleSheet.create({
   blueArSubText: {
     color: '#2563EB',
   },
-  // Sary-inspired Obsidian-Emerald Dark Box Themes (Dark Mode ONLY)
+  // Softened 50% Dark Box Themes (Dark Mode ONLY — overridden cleanly by themeColors when Olive 80s is active)
   darkBeigeCard: {
-    backgroundColor: '#10221B',
-    borderColor: 'rgba(60, 232, 142, 0.30)',
+    backgroundColor: '#1B2521',
+    borderColor: '#313D3A',
   },
   darkBeigeText: {
-    color: '#3CE88E',
+    color: '#6FB894',
   },
   darkBeigeSubText: {
-    color: '#9BB0AC',
+    color: '#8F9E9A',
   },
   darkGreenCaCard: {
-    backgroundColor: '#1F1413',
-    borderColor: 'rgba(242, 113, 88, 0.32)',
+    backgroundColor: '#251E1D',
+    borderColor: '#3A3130',
   },
   darkGreenCaText: {
-    color: '#F27158',
+    color: '#C48175',
   },
   darkGreenCaSubText: {
-    color: '#9BB0AC',
+    color: '#8F9E9A',
   },
   darkBlueArCard: {
-    backgroundColor: '#0F1F22',
-    borderColor: 'rgba(79, 209, 217, 0.32)',
+    backgroundColor: '#1A2426',
+    borderColor: '#2F3D40',
   },
   darkBlueArText: {
-    color: '#4FD1D9',
+    color: '#74AEB4',
   },
   darkBlueArSubText: {
-    color: '#9BB0AC',
+    color: '#8F9E9A',
   },
   accountTop: {
     flexDirection: 'row',
