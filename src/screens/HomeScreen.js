@@ -76,7 +76,18 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
   const [homeViewTrigger, setHomeViewTrigger] = useState(0);
   const [voiceSnackbarText, setVoiceSnackbarText] = useState('');
   const snackbarTimerRef = useRef(null);
+  const [headerTooltipText, setHeaderTooltipText] = useState('');
+  const headerTooltipTimerRef = useRef(null);
   const hasShownStartupAlert = useRef(false);
+
+  const showHeaderTooltip = (label) => {
+    if (!label) return;
+    if (headerTooltipTimerRef.current) clearTimeout(headerTooltipTimerRef.current);
+    setHeaderTooltipText(label);
+    headerTooltipTimerRef.current = setTimeout(() => {
+      setHeaderTooltipText('');
+    }, 2600);
+  };
 
   // Auto-scrolling top action bar refs & state
   const isToolbarScrollLocked = alertPrefs?.toolbarScrollLocked === true;
@@ -130,6 +141,7 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
   useEffect(() => {
     return () => {
       if (snackbarTimerRef.current) clearTimeout(snackbarTimerRef.current);
+      if (headerTooltipTimerRef.current) clearTimeout(headerTooltipTimerRef.current);
     };
   }, []);
 
@@ -197,8 +209,19 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
                   styles.settingsHeaderBtn,
                   { backgroundColor: isDarkMode ? themeColors.surfaceSecondary : '#EFF6FF', borderColor: isDarkMode ? themeColors.border : '#BFDBFE' },
                 ]}
+                onPressIn={() =>
+                  showHeaderTooltip(
+                    isArabic ? '❓ المساعدة ودليل الاستخدام ومميزات التطبيق' : '❓ Help Guide & App Features'
+                  )
+                }
+                onLongPress={() =>
+                  showHeaderTooltip(
+                    isArabic ? '❓ المساعدة ودليل الاستخدام ومميزات التطبيق' : '❓ Help Guide & App Features'
+                  )
+                }
                 onPress={() => setHelpModalVisible(true)}
                 activeOpacity={0.7}
+                accessibilityLabel={isArabic ? 'المساعدة ودليل الاستخدام' : 'Help Guide'}
               >
                 <MaterialCommunityIcons
                   name="help-circle-outline"
@@ -213,8 +236,23 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
                   styles.settingsHeaderBtn,
                   { backgroundColor: isDarkMode ? themeColors.surfaceSecondary : '#F1F5F9', borderColor: isDarkMode ? themeColors.border : '#E2E8F0' },
                 ]}
+                onPressIn={() =>
+                  showHeaderTooltip(
+                    isBalancesHidden
+                      ? (isArabic ? '👁️ إظهار جميع الأرصدة والمبالغ' : '👁️ Show all balances & amounts')
+                      : (isArabic ? '🙈 إخفاء جميع الأرصدة والمبالغ للخصوصية' : '🙈 Hide all balances for privacy')
+                  )
+                }
+                onLongPress={() =>
+                  showHeaderTooltip(
+                    isBalancesHidden
+                      ? (isArabic ? '👁️ إظهار جميع الأرصدة والمبالغ' : '👁️ Show all balances & amounts')
+                      : (isArabic ? '🙈 إخفاء جميع الأرصدة والمبالغ للخصوصية' : '🙈 Hide all balances for privacy')
+                  )
+                }
                 onPress={toggleHideBalances}
                 activeOpacity={0.7}
+                accessibilityLabel={isArabic ? 'إخفاء أو إظهار الأرصدة' : 'Hide or Show Balances'}
               >
                 <MaterialCommunityIcons
                   name={isBalancesHidden ? 'eye-off-outline' : 'eye-outline'}
@@ -229,8 +267,23 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
                   styles.settingsHeaderBtn,
                   { backgroundColor: isDarkMode ? themeColors.surfaceSecondary : '#F1F5F9', borderColor: isDarkMode ? themeColors.border : '#E2E8F0' },
                 ]}
+                onPressIn={() =>
+                  showHeaderTooltip(
+                    isDarkMode
+                      ? (isArabic ? '☀️ التبديل إلى الوضع النهاري' : '☀️ Switch to Light Mode')
+                      : (isArabic ? '🌙 التبديل إلى الوضع الليلي' : '🌙 Switch to Dark Mode')
+                  )
+                }
+                onLongPress={() =>
+                  showHeaderTooltip(
+                    isDarkMode
+                      ? (isArabic ? '☀️ التبديل إلى الوضع النهاري' : '☀️ Switch to Light Mode')
+                      : (isArabic ? '🌙 التبديل إلى الوضع الليلي' : '🌙 Switch to Dark Mode')
+                  )
+                }
                 onPress={toggleDarkMode}
                 activeOpacity={0.7}
+                accessibilityLabel={isArabic ? 'تبديل الوضع الليلي والنهاري' : 'Toggle Dark Mode'}
               >
                 <MaterialCommunityIcons
                   name={isDarkMode ? 'weather-sunny' : 'weather-night'}
@@ -245,14 +298,53 @@ export const HomeScreen = ({ onNavigateToHistory, onNavigateToSettings }) => {
                     styles.settingsHeaderBtn,
                     { backgroundColor: isDarkMode ? themeColors.surfaceSecondary : '#F1F5F9', borderColor: isDarkMode ? themeColors.border : '#E2E8F0' },
                   ]}
+                  onPressIn={() =>
+                    showHeaderTooltip(
+                      isArabic ? '⚙️ فتح الإعدادات والبنوك والنسخ الاحتياطي' : '⚙️ Open Settings, Banks & Backups'
+                    )
+                  }
+                  onLongPress={() =>
+                    showHeaderTooltip(
+                      isArabic ? '⚙️ فتح الإعدادات والبنوك والنسخ الاحتياطي' : '⚙️ Open Settings, Banks & Backups'
+                    )
+                  }
                   onPress={onNavigateToSettings}
                   activeOpacity={0.7}
+                  accessibilityLabel={isArabic ? 'الإعدادات' : 'Settings'}
                 >
                   <MaterialCommunityIcons name="cog-outline" size={20} color={isDarkMode ? themeColors.textSecondary : COLORS.textSecondary} />
                 </TouchableOpacity>
               )}
             </View>
           </View>
+
+          {/* Header Button Function Tooltip Pill (appears when touching or holding any top header icon) */}
+          {!!headerTooltipText && (
+            <View
+              style={{
+                alignSelf: 'center',
+                marginTop: 4,
+                marginBottom: 2,
+                paddingHorizontal: 12,
+                paddingVertical: 5,
+                borderRadius: 10,
+                backgroundColor: isDarkMode ? themeColors.surfaceSecondary : '#1E3A5F',
+                borderWidth: 1,
+                borderColor: isDarkMode ? themeColors.primary : '#2C4E7E',
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 11.5,
+                  fontWeight: '800',
+                  color: isDarkMode ? themeColors.textPrimary : '#F5E6C8',
+                  textAlign: 'center',
+                }}
+              >
+                {headerTooltipText}
+              </Text>
+            </View>
+          )}
 
           {/* Bottom Row: Navigation & Action Tabs cleanly positioned underneath (slow ping-pong auto-scroll unless locked in Settings) */}
           <ScrollView

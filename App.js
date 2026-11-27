@@ -275,7 +275,7 @@ function MainApp() {
       case 'history':
         return <HistoryScreen />;
       case 'settings':
-        return <SettingsScreen />;
+        return <SettingsScreen onClose={() => setActiveTab('home')} />;
       default:
         return <HomeScreen onNavigateToHistory={() => setActiveTab('history')} />;
     }

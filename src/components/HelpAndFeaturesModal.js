@@ -6,7 +6,11 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
+  Image,
+  useWindowDimensions,
 } from 'react-native';
+
+const ABOUT_AR_PLAQUE = require('../../assets/about-ar-plaque.jpg');
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/theme';
@@ -15,6 +19,7 @@ import { useExpense } from '../context/ExpenseContext';
 export const HelpAndFeaturesModal = ({ visible, onClose, initialTab = 'help' }) => {
   const { isArabic, isDarkMode, themeColors } = useExpense();
   const insets = useSafeAreaInsets();
+  const { width: winWidth } = useWindowDimensions();
   const [activeTab, setActiveTab] = useState(initialTab || 'help'); // 'help' | 'features'
 
   const helpSteps = isArabic
@@ -32,8 +37,8 @@ export const HelpAndFeaturesModal = ({ visible, onClose, initialTab = 'help' }) 
           icon: 'minus-circle-outline',
           color: '#DC2626',
           bg: '#FEF2F2',
-          title: 'تسجيل المصروفات والوارد وسداد الكروت',
-          desc: 'اضغط على الزر الدائري «تسجيل مصروف» لإضافة مصروفك يدوياً أو باستخدام المساعد الصوتي الذكي بالعامية المصرية (مثل: "150 جنيه بنزين كاش"). كما يمكنك تسجيل الدخل الوارد، التحويل بين حساباتك، أو سداد كروت الائتمان بسهولة.',
+          title: 'تسجيل المصروفات والوارد وتسجيل سداد الكروت',
+          desc: 'اضغط على الزر الدائري «تسجيل مصروف» لإضافة مصروفك يدوياً أو باستخدام المساعد الصوتي الذكي بالعامية المصرية (مثل: "150 جنيه بنزين كاش"). كما يمكنك تسجيل الدخل الوارد، التحويل بين حساباتك، أو تسجيل سداد كروت الائتمان بسهولة.',
         },
         {
           step: '3',
@@ -407,6 +412,26 @@ export const HelpAndFeaturesModal = ({ visible, onClose, initialTab = 'help' }) 
                   </View>
                 ))}
               </>
+            )}
+
+            {isArabic && (
+              <View
+                style={{
+                  alignSelf: 'center',
+                  width: Math.min(winWidth - 56, 290),
+                  aspectRatio: 545 / 773,
+                  marginTop: 8,
+                  marginBottom: 6,
+                  borderRadius: 16,
+                  overflow: 'hidden',
+                }}
+              >
+                <Image
+                  source={ABOUT_AR_PLAQUE}
+                  style={{ width: '100%', height: '100%' }}
+                  resizeMode="contain"
+                />
+              </View>
             )}
 
             <TouchableOpacity

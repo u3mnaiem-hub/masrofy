@@ -933,7 +933,7 @@ export const AddTransactionModal = ({
             showsVerticalScrollIndicator={false}
             contentContainerStyle={[
               styles.scrollBody,
-              keyboardHeight > 0 && { paddingBottom: Math.min(keyboardHeight, 240) + 40 },
+              keyboardHeight > 0 && { paddingBottom: 72 },
             ]}
             keyboardShouldPersistTaps="handled"
           >
